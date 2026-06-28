@@ -2,7 +2,7 @@
 
 Hệ thống quản lý khách hàng và hồ sơ phẫu thuật thẩm mỹ cho Swan Clinic.
 
-**Current status:** Phase 1, 2, 3 đã hoàn thành — full project scaffold, authentication, role-based access control, customers (với dialog CRUD + delete approval), cases, payments, services, tasks, calendar, checklist, status workflow, premium Apple/Stripe-style theme.
+**Current status:** Phase 1, 2, 3, 4 đã hoàn thành — full project scaffold, authentication, role-based access control, customers (với dialog CRUD + delete approval), cases, payments, services, tasks, calendar, checklist, status workflow, attachments, consents, post-op follow-ups, notifications, audit logs, và premium Apple/Stripe-style theme.
 
 ## Tech Stack
 
@@ -68,7 +68,7 @@ Khi dev mode được bật, app chạy **hoàn toàn bằng mock data in-memory
 - ✅ **User management**: đọc / tạo / sửa / kích hoạt / ngừng hoạt động — không cần Firebase Admin SDK
 - ✅ **Firestore calls**: tất cả CRUD (`getDocument`, `setDocument`, `updateDocument`, `deleteDocument`, `getAllDocuments`) tự động rẽ vào mock store ở server
 - ✅ **API routes**: bypass Admin SDK, thao tác trực tiếp trên mock store
-- ✅ **Seed data**: 12 users (1 cho mỗi role) + 5 customers + 5 cases + 6 payments + 6 followups + 7 tasks + 7 appointments + 4 locations + 17 services
+- ✅ **Seed data**: 12 users (mỗi role 1) + 20 customers + 20 cases + 21 case-services + 6 payments + 6 followups + 7 tasks + 7 appointments + 3 hospital coordinations + 5 staff assignments + 4 locations + 17 services + 8 attachments + 10 consents + 10 notifications + 14 audit logs
 
 **Không cần** bất kỳ biến môi trường Firebase nào. Dữ liệu reset khi restart server.
 
@@ -97,6 +97,9 @@ Bypass login bằng cách truy cập trực tiếp:
 - [http://localhost:3000/tasks](http://localhost:3000/tasks) — Công việc
 - [http://localhost:3000/payments](http://localhost:3000/payments) — Thanh toán
 - [http://localhost:3000/followups](http://localhost:3000/followups) — Theo dõi sau PT
+- [http://localhost:3000/media-library](http://localhost:3000/media-library) — Thư viện tài liệu (ảnh, PDF)
+- [http://localhost:3000/notifications](http://localhost:3000/notifications) — Thông báo
+- [http://localhost:3000/audit-logs](http://localhost:3000/audit-logs) — Nhật ký hoạt động
 - [http://localhost:3000/settings/users](http://localhost:3000/settings/users) — Quản lý người dùng (admin)
 - [http://localhost:3000/settings/services](http://localhost:3000/settings/services) — Dịch vụ
 - [http://localhost:3000/settings/treatment-locations](http://localhost:3000/settings/treatment-locations) — Điểm điều trị
@@ -125,19 +128,19 @@ src/
 │   │   ├── payments/                 # List / New
 │   │   ├── calendar/                 # Week/month view + appointment modal
 │   │   ├── tasks/                    # List + create form
-│   │   ├── followups/                # List + form
-│   │   ├── media-library/            # Stub
-│   │   ├── reports/                  # Stub
+│   │   ├── followups/                # Post-op follow-up (today / overdue / upcoming)
+│   │   ├── media-library/            # Attachments grid + upload
+│   │   ├── reports/                  # Stub (Phase 5)
 │   │   ├── settings/                 # users / roles / services / treatment-locations
-│   │   ├── notifications/            # Stub
-│   │   └── audit-logs/               # Stub
-│   ├── api/users/                    # Admin API routes
+│   │   ├── notifications/            # In-app notification center
+│   │   └── audit-logs/               # Audit trail with filters + diff view
+│   ├── api/                          # REST API (users, customers, cases, payments, attachments, consents, notifications, followups, audit-logs)
 │   ├── layout.tsx                    # Root layout (Inter font, Vietnamese)
 │   ├── providers.tsx                 # AuthProvider + ToastProvider
 │   ├── page.tsx                      # Root redirect
 │   └── globals.css                   # Premium theme tokens + glass utilities
 ├── components/
-│   ├── ui/                           # 20 premium UI components (Button, Modal, Toast, ...)
+│   ├── ui/                           # 16 premium UI components (Button, Modal, Toast, ...)
 │   ├── layout/                       # Sidebar (glass), Topbar (glass), MobileNav, AppShell
 │   ├── auth/                         # LoginForm
 │   ├── dashboard/                    # StatCards (real data), RecentActivity (real data)
@@ -149,25 +152,27 @@ src/
 │   ├── locations/                    # LocationListTable, LocationForm
 │   ├── services/                     # ServiceListTable, ServiceForm
 │   ├── tasks/                        # TaskList, TaskForm
-│   └── followups/                    # FollowupList, FollowupForm
+│   ├── followups/                    # FollowupList, FollowupForm
+│   ├── attachments/                  # AttachmentUploadDialog, AttachmentList
+│   └── consents/                     # ConsentPanel (create + status transitions)
 ├── lib/
-│   ├── firebase/                     # Client + Admin SDK setup
+│   ├── firebase/                     # Client + Admin SDK + Storage helpers
 │   ├── auth/                         # AuthProvider, RBAC, mock users
-│   ├── firestore/                    # 14 domain modules (users, customers, cases, ...)
-│   ├── types/                        # 14 type modules
+│   ├── firestore/                    # 15 domain modules (users, customers, cases, attachments, consents, notifications, followups, audit, ...)
+│   ├── types/                        # 15 type modules (User, Customer, Case, Payment, Task, Appointment, Attachment, Consent, Followup, Notification, Audit, ...)
 │   ├── hooks/                        # useCurrentUser
-│   ├── validators/                   # case, customer, payment, task, treatment-location, staff-assignment
+│   ├── validators/                   # case, customer, payment, task, treatment-location, staff-assignment, attachment, consent
 │   ├── notifications/                # in-app, telegram, templates
 │   ├── checklist/                    # evaluatePreHospitalChecklist, evaluatePreProcedureChecklist
 │   ├── tasks/                        # auto-tasks (triggerAutoTasks)
-│   ├── mock/store.ts                 # In-memory mock data + 8 seed functions
+│   ├── mock/store.ts                 # In-memory mock data + 15 seed functions
 │   └── utils/                        # cn, format, validation
 ├── config/
 │   ├── firebase.ts                   # Config, isDevMode, hasFirebaseConfig
 │   ├── roles.ts                      # ROLE_LABELS, ROLE_PERMISSIONS
 │   └── constants.ts                  # APP_NAME, PAGE_TITLES
 └── constants/
-    ├── case-status.ts                # Status labels, colors, transitions
+    ├── case-status.ts                # Status labels, colors, transitions, post-op statuses
     ├── permissions.ts                # Permission constants (SENSITIVE_FIELD, MEDICAL_NOTE, DELETE_APPROVE, ...)
     └── service-categories.ts         # Service category labels
 ```
@@ -252,12 +257,13 @@ Permission matrix defined in `src/config/roles.ts` and `src/constants/permission
   - DropdownMenu, Tabs, Textarea shared components
   - Refined UI primitives (Button, Card, Badge, Input, Select, Modal, DataTable)
 
-### 🔜 Phase 4 — Attachments & Notifications
-- Attachments (upload, gallery, visibility)
-- Consent (medical consent forms)
-- Post-op follow-up (automated schedules, templates)
-- Notifications (in-app, Telegram)
-- Audit logs (comprehensive view)
+### ✅ Phase 4 — Attachments, Consents & Notifications
+- **Attachments**: drag-and-drop upload, visibility (internal / case_team / customer), per-case list, mock storage fallback
+- **Consents**: 4 loại (treatment, image_storage, marketing_usage, hospital_sharing), status workflow pending → granted/denied/revoked
+- **Post-op Follow-up**: auto-create D1/D3/D7/D14/D30/D90 khi case chuyển sang `procedure_completed`, 3 sections (today / overdue / upcoming)
+- **Notifications**: 14 event types (new_case, payment_pending, procedure_completed, postop_followup_due, complaint, ...), in-app center với mark-as-read + read-all
+- **Audit logs**: 18 AuditAction types, filter theo entity/action/actor, expandable JSON diff cho state changes
+- Seed data: 8 attachments + 10 consents + 6 followups (D1-D90 cho case #5) + 10 notifications + 14 audit logs
 
 ### 🔜 Phase 5 — Reports & Deployment
 - Reports (revenue, CASE pipeline, conversion)
@@ -302,5 +308,9 @@ Permission matrix defined in `src/config/roles.ts` and `src/constants/permission
 - **Delete approval** — xem `DELETE_APPROVE_ROLES` để biết ai có quyền phê duyệt
 - **Sales permissions** — `sales_online`/`sales_offline` xem được address, ghi chú y tế, ghi chú riêng tư
 - **Created by tracking** — mỗi customer có `createdBy` (user ID), hiển thị tên ở list + detail
+- **Attachments** — upload dialog với drag-and-drop, mock storage trong dev mode, 3 visibility levels
+- **Consents** — 4 loại (treatment, image_storage, marketing_usage, hospital_sharing), workflow pending → granted/denied/revoked
+- **Follow-ups** — auto-create D1/D3/D7/D14/D30/D90 khi case chuyển sang `procedure_completed`
+- **Audit logging** — 18 action types, ghi tự động ở attachment upload/delete, consent status change
 
 Xem `CLAUDE.md` để biết thêm về conventions, project structure, và bug fixes.

@@ -100,6 +100,46 @@ Hệ thống quản lý khách hàng và hồ sơ phẫu thuật thẩm mỹ cho
 
 ---
 
+## Phase 4 — Completed ✅
+
+### Phase 4 Features
+
+- [x] **Attachments** — drag-and-drop upload dialog, visibility levels (internal / case_team / customer), per-case list with delete, mock storage fallback (`src/components/attachments/`)
+- [x] **Consents** — 4 types (treatment, image_storage, marketing_usage, hospital_sharing), status workflow pending → granted/denied/revoked, create modal (`src/components/consents/consent-panel.tsx`)
+- [x] **Post-op Follow-up** — auto-create D1/D3/D7/D14/D30/D90 when case → `procedure_completed`, 3 sections (today / overdue / upcoming) + stat cards (`src/components/followups/`)
+- [x] **Notifications** — 14 event types (new_case, payment_pending, procedure_completed, postop_followup_due, complaint, ...), in-app center with mark-as-read + read-all (`src/app/(protected)/notifications/`)
+- [x] **Audit logs** — 18 AuditAction types, filter by entity/action/actor, expandable JSON diff (`src/app/(protected)/audit-logs/`)
+
+### Critical files (Phase 4)
+
+- `src/components/attachments/attachment-upload-dialog.tsx` — drag-and-drop upload + audit log
+- `src/components/attachments/attachment-list.tsx` — per-case list + visibility control
+- `src/components/consents/consent-panel.tsx` — consent CRUD + status transitions
+- `src/app/(protected)/media-library/page.tsx` — attachments grid (type/visibility/search filters)
+- `src/app/(protected)/followups/page.tsx` — follow-up dashboard (today/overdue/upcoming)
+- `src/app/(protected)/notifications/page.tsx` — notification center (14 event types)
+- `src/app/(protected)/audit-logs/page.tsx` — audit trail with diff view
+- `src/lib/firestore/attachments.ts` — attachment CRUD + visibility
+- `src/lib/firestore/consents.ts` — consent CRUD + status update
+- `src/lib/firestore/followups.ts` — followup CRUD + auto-create (D1-D90)
+- `src/lib/firestore/notifications.ts` — notification CRUD + mark read
+- `src/lib/firestore/audit.ts` — writeAuditLog + query helpers
+- `src/lib/types/attachment.ts` — Attachment, AttachmentType, AttachmentVisibility
+- `src/lib/types/consent.ts` — Consent, ConsentType, ConsentStatus
+- `src/lib/types/followup.ts` — Followup, FollowupStatus
+- `src/lib/types/notification.ts` — Notification, NotificationEventType
+- `src/lib/types/audit.ts` — AuditLog, AuditAction (18 types), AuditEntityType
+
+### Phase 4 Seed Data
+
+- 8 attachments (ID front/back, payment proof, before/after, postop D1/D3, medical doc)
+- 10 consents (treatment, image_storage, marketing_usage, hospital_sharing — mixed statuses)
+- 6 followups (D1/D3/D7/D14/D30/D90 for case #5)
+- 10 notifications (all event types covered)
+- 14 audit logs (customer_created/updated, case_created/status_changed, attachment, payment, consent, task, staff_assignment)
+
+---
+
 ## Premium Theme (Applied globally)
 
 ### Design System
@@ -176,13 +216,13 @@ src/
 │   │   ├── payments/                    # List / New
 │   │   ├── calendar/                    # Week/month view + appointment modal
 │   │   ├── tasks/                       # List + create form
-│   │   ├── followups/                   # List + form
-│   │   ├── media-library/               # Stub
-│   │   ├── reports/                     # Stub
+│   │   ├── followups/                   # Post-op follow-up dashboard
+│   │   ├── media-library/               # Attachments grid + upload
+│   │   ├── reports/                     # Stub (Phase 5)
 │   │   ├── settings/                    # users / roles / services / treatment-locations
-│   │   ├── notifications/               # Stub
-│   │   └── audit-logs/                  # Stub
-│   ├── api/users/                       # REST API (GET/POST/PATCH)
+│   │   ├── notifications/               # In-app notification center
+│   │   └── audit-logs/                  # Audit trail with filters + diff view
+│   ├── api/                              # REST API (users, customers, cases, payments, attachments, consents, notifications, followups, audit-logs)
 │   ├── layout.tsx                       # Root layout (Inter font, Vietnamese)
 │   ├── providers.tsx                    # AuthProvider + ToastProvider
 │   └── page.tsx                         # Root redirect
@@ -216,19 +256,21 @@ src/
 │   ├── locations/                       # LocationListTable, LocationForm
 │   ├── services/                        # ServiceListTable, ServiceForm
 │   ├── tasks/                           # TaskList, TaskForm
-│   └── followups/                       # FollowupList, FollowupForm
+│   ├── followups/                       # FollowupList, FollowupForm
+│   ├── attachments/                     # AttachmentUploadDialog, AttachmentList
+│   └── consents/                        # ConsentPanel (create + status transitions)
 │
 ├── lib/
 │   ├── firebase/                        # client.ts, admin.ts, auth.ts, firestore.ts, storage.ts
 │   ├── auth/                            # AuthProvider, mock-users, rb
-│   ├── firestore/                       # 12 domain modules (users, customers, cases, payments, ...)
-│   ├── types/                           # 14 type modules (User, Customer, Case, Payment, Task, ...)
+│   ├── firestore/                       # 15 domain modules (users, customers, cases, payments, attachments, consents, notifications, followups, audit, ...)
+│   ├── types/                           # 15 type modules (User, Customer, Case, Payment, Task, Appointment, Attachment, Consent, Followup, Notification, Audit, ...)
 │   ├── hooks/                           # useCurrentUser
-│   ├── validators/                      # case, customer, payment, task, treatment-location, staff-assignment
+│   ├── validators/                      # case, customer, payment, task, treatment-location, staff-assignment, attachment, consent
 │   ├── notifications/                   # in-app, telegram, templates
 │   ├── checklist/                       # evaluatePreHospitalChecklist, evaluatePreProcedureChecklist
 │   ├── tasks/                           # auto-tasks (triggerAutoTasks)
-│   ├── mock/store.ts                    # In-memory mock data + seeds
+│   ├── mock/store.ts                    # In-memory mock data + 15 seed functions
 │   └── utils/                           # cn, format, validation
 │
 ├── config/
@@ -325,4 +367,8 @@ Tất cả firestore helpers tự động rẽ vào mock store khi `isDevMode &&
 - **Phone uniqueness**: `createCustomer` và `updateCustomer` sẽ throw error nếu SĐT trùng. Frontend hiện lỗi qua toast.
 - **Customer deletion**: KD chỉ gửi yêu cầu. CS/CEO/Trưởng KD mới phê duyệt được. Xem `DELETE_APPROVE_ROLES`.
 - **Sales permissions**: `sales_online` và `sales_offline` có thể xem địa chỉ, ghi chú y tế, ghi chú riêng tư — được set trong `@/constants/permissions.ts`.
-- **AuditAction**: Nếu cần action mới, phải add vào union type trong `@/lib/types/audit.ts`.
+- **AuditAction**: Nếu cần action mới, phải add vào union type trong `@/lib/types/audit.ts`. Hiện đã có 18 action types — xem `@/lib/types/audit.ts`.
+- **Notification events**: Nếu cần event type mới, add vào `NotificationEventType` union trong `@/lib/types/notification.ts` và labels/icons trong `@/lib/notifications/templates.ts` và `@/app/(protected)/notifications/page.tsx`. Hiện có 14 event types.
+- **Attachment upload**: `attachment-upload-dialog` tự ghi audit log khi upload. Trong dev mode, file lưu mock URL — không cần Firebase Storage thật.
+- **Consent workflow**: 4 types (treatment, image_storage, marketing_usage, hospital_sharing). Status workflow: pending → granted/denied/revoked. Mọi thay đổi status đều ghi audit log.
+- **Follow-up auto-create**: `createPostOpFollowups(caseId)` tạo D1/D3/D7/D14/D30/D90 tự động. Trigger khi case chuyển sang `procedure_completed`.
