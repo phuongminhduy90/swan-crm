@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --swan-500: #00ADBE;
+    --swan-600: #0096A8;
+    --champagne-500: #C9A96E;
+    --cream: #FFF9F0;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply text-gray-900 antialiased;
+    background: linear-gradient(135deg, #FFF9F0 0%, #FFFFFF 40%, #F0FAFC 100%);
+    background-attachment: fixed;
+  }
+
+  /* Custom scrollbar for premium feel */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-gray-300/60;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-400/80;
+  }
+}
+
+@layer components {
+  /* Premium glass morphism utility */
+  .glass {
+    @apply bg-white/80 backdrop-blur-xl border border-white/40 shadow-medium;
+  }
+
+  /* Premium card — softer than default Card */
+  .premium-card {
+    @apply rounded-2xl border border-gray-100/80 bg-white shadow-soft transition-shadow duration-300;
+  }
+  .premium-card-hover {
+    @apply hover:shadow-medium hover:border-swan-100;
+  }
+
+  /* Premium input base — applies to any element needing input-like styling */
+  .premium-input {
+    @apply w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 transition-all duration-200 focus:border-swan-400 focus:outline-none focus:ring-4 focus:ring-swan-500/15 disabled:bg-gray-50 disabled:text-gray-500;
+  }
+}

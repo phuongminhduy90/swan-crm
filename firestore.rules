@@ -1,0 +1,316 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper functions ──────────────────────────────────────────
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function getRole() {
+      return getUserData().role;
+    }
+
+    function hasRole(role) {
+      return isAuthenticated() && getRole() == role;
+    }
+
+    function hasAnyRole(roles) {
+      return isAuthenticated() && getRole() in roles;
+    }
+
+    function isAdmin() {
+      return hasRole('admin');
+    }
+
+    function isManagement() {
+      return hasAnyRole(['admin', 'ceo', 'cso']);
+    }
+
+    function isSales() {
+      return hasAnyRole(['master_sales', 'sales_online', 'sales_offline']);
+    }
+
+    function isAccountant() {
+      return hasAnyRole(['admin', 'accountant']);
+    }
+
+    function isMedical() {
+      return hasAnyRole(['doctor', 'nurse']);
+    }
+
+    function isActive() {
+      return isAuthenticated() && getUserData().isActive == true;
+    }
+
+    // ── Users ─────────────────────────────────────────────────────
+
+    match /users/{userId} {
+      // Users can read their own profile, management can read all
+      allow read: if isAuthenticated() &&
+        (request.auth.uid == userId || isManagement() || isAdmin());
+
+      // Only admin can create/update users
+      allow write: if isAdmin() && isActive();
+
+      // No deletion — use active: false instead
+      allow delete: if false;
+    }
+
+    // ── Customers ─────────────────────────────────────────────────
+
+    match /customers/{customerId} {
+      // Most roles can read customers (except media)
+      allow read: if isAuthenticated() && isActive() &&
+        getRole() != 'media';
+
+      // Sales and management can create customers
+      allow create: if isAuthenticated() && isActive() &&
+        hasAnyRole(['admin', 'cso', 'master_sales', 'sales_online', 'sales_offline']);
+
+      // Management & coordinator: full update
+      // Sales: chỉ update customer do mình tạo (createdBy guard)
+      allow update: if isAuthenticated() && isActive() && (
+        hasAnyRole(['admin', 'cso', 'master_sales', 'coordinator']) ||
+        (isSales() && resource.data.createdBy == request.auth.uid)
+      );
+
+      allow delete: if false;
+    }
+
+    // ── Cases ─────────────────────────────────────────────────────
+
+    match /cases/{caseId} {
+      // Most roles can read cases
+      allow read: if isAuthenticated() && isActive();
+
+      // Sales và management có thể tạo ca
+      allow create: if isAuthenticated() && isActive() &&
+        hasAnyRole(['admin', 'cso', 'master_sales', 'sales_online', 'sales_offline']);
+
+      // Field-level restriction theo role:
+      // - Management/Sales: full update
+      // - Doctor: chỉ medical fields + status
+      // - Coordinator: chỉ operational fields + status
+      // - Nurse/CSKH: chỉ status (post-op transitions)
+      allow update: if isAuthenticated() && isActive() && (
+        // Management và sales: full update
+        hasAnyRole(['admin', 'cso', 'master_sales', 'sales_online', 'sales_offline']) ||
+        // Kế toán: chỉ update paymentStatus liên quan
+        (hasRole('accountant') &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['paymentStatus', 'amountPaid', 'remainingAmount', 'updatedBy', 'updatedAt'])) ||
+        // Bác sĩ: chỉ medical fields + status
+        (hasRole('doctor') &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['medicalNote', 'status', 'priority', 'updatedBy', 'updatedAt'])) ||
+        // Điều phối viên: operational fields + status
+        (hasRole('coordinator') &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'treatmentLocationId', 'treatmentLocationType',
+                      'expectedLabDate', 'expectedProcedureDate', 'updatedBy', 'updatedAt'])) ||
+        // Y tá và CSKH: chỉ status (post-op transitions)
+        (hasAnyRole(['nurse', 'cskh_postop']) &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['status', 'updatedBy', 'updatedAt']))
+      );
+
+      allow delete: if false;
+    }
+
+    // ── Case Services ──────────────────────────────────────────────
+
+    match /caseServices/{serviceId} {
+      allow read: if isAuthenticated() && isActive();
+      allow write: if isAuthenticated() && isActive() &&
+        hasAnyRole(['admin', 'cso', 'master_sales', 'sales_online', 'sales_offline']);
+      allow delete: if false;
+    }
+
+    // ── Payments ──────────────────────────────────────────────────
+
+    match /payments/{paymentId} {
+      // Accounting and management can read all payments
+      allow read: if isAuthenticated() && isActive() &&
+        hasAnyRole(['admin', 'ceo', 'cso', 'accountant', 'master_sales', 'sales_online', 'sales_offline']);
+
+      // Sales can create payment requests (pending only)
+      allow create: if isAuthenticated() && isActive() &&
+        hasAnyRole(['admin', 'cso', 'master_sales', 'sales_online', 'sales_offline', 'accountant']) &&
+        request.resource.data.status == 'pending';
+
+      // Only accountant/admin can confirm or reject
+      allow update: if isAuthenticated() && isActive() && isAccountant();
+
+      allow delete: if false;
+    }
+
+    // ── Treatment Locations ───────────────────────────────────────
+
+    match /treatmentLocations/{locationId} {
+      allow read: if isAuthenticated() && isActive();
+      allow write: if isAdmin() && isActive();
+      allow delete: if false;
+    }
+
+    // ── Hospital Coordinations ────────────────────────────────────
+
+    match /hospitalCoordinations/{coordId} {
+      allow read: if isAuthenticated() && isActive() &&
+        hasAnyRole(['admin', 'ceo', 'cso', 'coordinator', 'doctor', 'nurse', 'master_sales']);
+      allow write: if isAuthenticated() && isActive() &&
+        hasAnyRole(['admin', 'cso', 'coordinator']);
+      allow delete: if false;
+    }
+
+    // ── Staff Assignments ─────────────────────────────────────────
+
+    match /staffAssignments/{assignmentId} {
+      allow read: if isAuthenticated() && isActive();
+      allow write: if isAuthenticated() && isActive() &&
+        hasAnyRole(['admin', 'cso', 'master_sales', 'coordinator']);
+      allow delete: if false;
+    }
+
+    // ── Appointments ──────────────────────────────────────────────
+
+    match /appointments/{appointmentId} {
+      allow read: if isAuthenticated() && isActive();
+      allow write: if isAuthenticated() && isActive() &&
+        hasAnyRole(['admin', 'cso', 'coordinator', 'doctor', 'master_sales', 'sales_online', 'sales_offline']);
+      allow delete: if false;
+    }
+
+    // ── Tasks ─────────────────────────────────────────────────────
+
+    match /tasks/{taskId} {
+      allow read: if isAuthenticated() && isActive();
+      // Chỉ roles có tasks:write được tạo/cập nhật task
+      allow create: if isAuthenticated() && isActive() &&
+        hasAnyRole(['admin', 'cso', 'master_sales', 'sales_online', 'sales_offline',
+                    'accountant', 'doctor', 'nurse', 'coordinator', 'cskh_postop']);
+      allow update: if isAuthenticated() && isActive() &&
+        hasAnyRole(['admin', 'cso', 'master_sales', 'sales_online', 'sales_offline',
+                    'accountant', 'doctor', 'nurse', 'coordinator', 'cskh_postop']);
+      allow delete: if false;
+    }
+
+    // ── Notifications ─────────────────────────────────────────────
+
+    match /notifications/{notificationId} {
+      // Chỉ người nhận hoặc management mới đọc được notification
+      allow read: if isAuthenticated() && isActive() && (
+        isManagement() ||
+        request.auth.uid in resource.data.recipientUserIds ||
+        getRole() in resource.data.recipientRoles
+      );
+      // Chỉ hệ thống (server) hoặc management tạo notification
+      allow create: if isAuthenticated() && isActive() && isManagement();
+      // Chỉ update readBy field
+      allow update: if isAuthenticated() && isActive() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy']);
+      allow delete: if false;
+    }
+
+    // ── Attachments ───────────────────────────────────────────────
+
+    match /attachments/{attachmentId} {
+      // Access controlled by visibility field
+      allow read: if isAuthenticated() && isActive() && (
+        // Admin/management can see all
+        isManagement() ||
+        // Medical team sees medical_team and above
+        (isMedical() && resource.data.visibility in ['medical_team', 'sales_team', 'media_approved', 'public_marketing']) ||
+        // Sales sees sales_team and above
+        (isSales() && resource.data.visibility in ['sales_team', 'media_approved', 'public_marketing']) ||
+        // Media only sees approved
+        (hasRole('media') && resource.data.visibility in ['media_approved', 'public_marketing']) ||
+        // Postop sees their assigned cases
+        (hasRole('cskh_postop') && resource.data.visibility in ['sales_team', 'media_approved', 'public_marketing']) ||
+        // Coordinator sees what they need
+        (hasRole('coordinator') && resource.data.visibility in ['sales_team', 'medical_team', 'media_approved', 'public_marketing']) ||
+        // Uploader can always see their own
+        resource.data.uploadedBy == request.auth.uid
+      );
+
+      // Upload: các roles có attachments:write được upload
+      // Media không upload được (chỉ xem ảnh đã approved)
+      allow create: if isAuthenticated() && isActive() &&
+        !hasRole('media') && !hasRole('ceo') &&
+        // Default visibility phải là private
+        request.resource.data.visibility == 'private';
+
+      // Visibility changes: chỉ admin/cso (CHANGE_VISIBILITY_ROLES)
+      allow update: if isAuthenticated() && isActive() &&
+        hasAnyRole(['admin', 'cso']);
+
+      allow delete: if false;
+    }
+
+    // ── Consents ──────────────────────────────────────────────────
+
+    match /consents/{consentId} {
+      // FIX: Thêm ngoặc rõ ràng để tránh operator precedence bug
+      // Media chỉ đọc consent loại marketing_usage
+      allow read: if (
+        isAuthenticated() && isActive() && !hasRole('media')
+      ) || (
+        hasRole('media') && isActive() && resource.data.consentType == 'marketing_usage'
+      );
+      // Roles có consents:write: admin, cso, master_sales, coordinator, doctor
+      allow write: if isAuthenticated() && isActive() &&
+        hasAnyRole(['admin', 'cso', 'master_sales', 'coordinator', 'doctor']);
+      allow delete: if false;
+    }
+
+    // ── Follow-ups ────────────────────────────────────────────────
+
+    match /followups/{followupId} {
+      allow read: if isAuthenticated() && isActive() &&
+        hasAnyRole(['admin', 'ceo', 'cso', 'doctor', 'cskh_postop', 'coordinator', 'master_sales']);
+      // Chỉ các role liên quan y tế/chăm sóc mới tạo được followup
+      allow create: if isAuthenticated() && isActive() &&
+        hasAnyRole(['admin', 'cso', 'doctor', 'nurse', 'coordinator', 'cskh_postop']);
+      // CSKH và bác sĩ có thể update, không xóa
+      allow update: if isAuthenticated() && isActive() &&
+        hasAnyRole(['admin', 'cso', 'doctor', 'cskh_postop']);
+      allow delete: if false;
+    }
+
+    // ── Services ──────────────────────────────────────────────────
+
+    match /services/{serviceId} {
+      allow read: if isAuthenticated() && isActive();
+      allow write: if isAdmin() && isActive();
+      allow delete: if false;
+    }
+
+    // ── Audit Logs ────────────────────────────────────────────────
+
+    match /auditLogs/{logId} {
+      // Read: management roles only
+      allow read: if isAuthenticated() && isActive() &&
+        hasAnyRole(['admin', 'ceo', 'cso', 'accountant']);
+
+      // Create: any authenticated active user (system writes)
+      allow create: if isAuthenticated() && isActive();
+
+      // Update/Delete: NEVER allowed (append-only)
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // ── Settings ──────────────────────────────────────────────────
+
+    match /settings/{settingId} {
+      allow read: if isAuthenticated() && isActive();
+      allow write: if isAdmin() && isActive();
+      allow delete: if false;
+    }
+  }
+}
