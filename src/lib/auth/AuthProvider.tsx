@@ -10,7 +10,7 @@ import {
 } from 'react';
 import { User as FirebaseUser } from 'firebase/auth';
 import { onAuthChange } from '@/lib/firebase/auth';
-import { getUser } from '@/lib/firestore/users';
+import { getUser, createUser } from '@/lib/firestore/users';
 import { User, UserRole } from '@/lib/types';
 import { isDevMode } from '@/config/firebase';
 import { MOCK_USERS } from './mock-users';
@@ -56,7 +56,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setFirebaseUser(user);
         if (user) {
           try {
-            const profile = await getUser(user.uid);
+            let profile = await getUser(user.uid);
+
+            // ── Auto-create profile nếu chưa tồn tại ──────────────────
+            if (!profile) {
+              const defaultRole = guessRoleFromEmail(user.email ?? '');
+              const now = new Date().toISOString();
+              const newUser: User = {
+                id: user.uid,
+                email: user.email ?? '',
+                displayName: user.displayName ?? user.email?.split('@')[0] ?? 'User',
+                role: defaultRole,
+                isActive: true,
+                createdAt: now,
+                updatedAt: now,
+              };
+              await createUser(newUser);
+              profile = newUser;
+              console.info(`[AuthProvider] Đã tạo profile mới cho ${user.email} với role "${defaultRole}"`);
+            }
+            // ──────────────────────────────────────────────────────────
+
             setUserProfile(profile);
             setError(null);
           } catch (err) {
@@ -103,3 +123,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 }
 
 export const useAuth = () => useContext(AuthContext);
+
+// ── Hàm đoán role dựa theo email ──────────────────────────────────────────────
+// Nếu email khớp pattern đã biết → gán role tương ứng
+// Mặc định → admin (có thể thay đổi trong Settings sau khi login)
+function guessRoleFromEmail(email: string): UserRole {
+  const e = email.toLowerCase();
+  if (e.includes('ceo'))         return 'ceo';
+  if (e.includes('cso'))         return 'cso';
+  if (e.includes('doctor') || e.includes('bs.') || e.includes('bsngoc')) return 'doctor';
+  if (e.includes('nurse') || e.includes('dieu duong'))  return 'nurse';
+  if (e.includes('accountant') || e.includes('ketoan')) return 'accountant';
+  if (e.includes('coordinator') || e.includes('coordin')) return 'coordinator';
+  if (e.includes('cskh') || e.includes('postop'))       return 'cskh_postop';
+  if (e.includes('media'))       return 'media';
+  if (e.includes('online'))      return 'sales_online';
+  if (e.includes('offline'))     return 'sales_offline';
+  if (e.includes('sales') || e.includes('master')) return 'master_sales';
+  return 'admin'; // mặc định → admin, có thể chỉnh trong Settings
+}

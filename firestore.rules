@@ -55,8 +55,11 @@ service cloud.firestore {
       allow read: if isAuthenticated() &&
         (request.auth.uid == userId || isManagement() || isAdmin());
 
-      // Only admin can create/update users
-      allow write: if isAdmin() && isActive();
+      // User có thể tự tạo document profile của CHÍNH MÌNH lần đầu đăng nhập
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+
+      // Chỉ admin mới được update user khác
+      allow update: if isAdmin() && isActive();
 
       // No deletion — use active: false instead
       allow delete: if false;
