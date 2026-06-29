@@ -46,9 +46,9 @@ export function PipelineFunnel({ data }: PipelineFunnelProps) {
         const stage = PIPELINE_STAGES.find((s) => s.key === item.stage)!;
 
         return (
-          <div key={item.stage} className="flex items-center gap-3">
+          <div key={item.stage} className="flex w-full max-w-[480px] items-center gap-3">
             {/* Bar */}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-1 items-center">
               <div
                 className={cn(
                   'relative h-10 rounded-xl bg-gradient-to-r transition-all duration-500 flex items-center justify-center',
@@ -68,9 +68,9 @@ export function PipelineFunnel({ data }: PipelineFunnelProps) {
               <span className="text-xs text-gray-500">({pct.toFixed(0)}%)</span>
             </div>
 
-            {/* Arrow connector */}
+            {/* Arrow connector (unused placeholder) */}
             {idx < data.length - 1 && (
-              <div className="absolute -bottom-1 left-1/2 hidden" />
+              <div className="hidden" />
             )}
           </div>
         );

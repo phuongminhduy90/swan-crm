@@ -36,7 +36,7 @@ export function RevenueReport({ payments, cases, dateRange }: RevenueReportProps
     const refund = filteredPayments
       .filter((p) => p.paymentType === 'refund')
       .reduce((sum, p) => sum + (p.amount ?? 0), 0);
-    const total = confirmed + pending;
+    const total = confirmed; // Tổng doanh thu = chỉ tính thanh toán đã xác nhận
     const uniqueCaseIds = new Set(filteredPayments.map((p) => p.caseId));
     const avgPerCase = uniqueCaseIds.size > 0 ? confirmed / uniqueCaseIds.size : 0;
     return { total, confirmed, pending, refund, avgPerCase };

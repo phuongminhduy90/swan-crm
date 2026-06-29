@@ -48,7 +48,6 @@ export const TOOLTIP_STYLE = {
 export const GRID_STYLE = {
   strokeDasharray: '3 3',
   stroke: '#F3F4F6',
-  vertical: false,
 } as const;
 
 /**

@@ -33,7 +33,7 @@ Hệ thống quản lý khách hàng và hồ sơ phẫu thuật thẩm mỹ cho
 
 - `npx tsc --noEmit` → 0 errors
 - `npm run lint` → 0 warnings
-- `npm run build` → 31 routes, 0 errors (`/reports` 128 kB / 357 kB First Load JS)
+- `npm run build` → 34 routes, 0 errors (post Phase 1–5 review)
 
 ---
 
@@ -238,7 +238,13 @@ Hệ thống quản lý khách hàng và hồ sơ phẫu thuật thẩm mỹ cho
 
 ## Bug Fixes (latest)
 
-### Dashboard Data
+### Phase 1–5 Review Fixes (2026-06-29)
+
+- **Dead code removed**: `handleStatusChange()` in `cases/[id]/page.tsx` was unused — `StatusWorkflow` `onTransition` already handled status changes. Removed.
+- **POST_OP_STATUSES typo fixed**: `'post_op_followup'` không tồn tại trong CaseStatus union. Trigger followup creation chỉ khi `newStatus === 'procedure_completed'`, và dùng `actualProcedureDate` thay vì `new Date()`.
+- **GRID_STYLE.vertical removed**: `vertical: false` trong `chart-theme.ts` bị spread vào `CartesianGrid`, ẩn grid lines dọc ở tất cả charts. Xóa prop này — mỗi chart tự quản lý.
+- **PipelineFunnel layout fixed**: Thêm `max-w-[480px] w-full` vào row + `flex-1` vào bar wrapper để `width: N%` reference đúng bounded container.
+- **Revenue total stat fixed**: `total = confirmed + pending` → `total = confirmed`. "Tổng doanh thu" chỉ nên tính thanh toán đã xác nhận.
 
 - **Before:** StatCards showed hardcoded `"—"`, RecentActivity was always empty
 - **After:** StatCards fetch real data (customers count, active cases, revenue this month, today's appointments). RecentActivity shows latest 10 activities with case status badges + customer links. Dashboard also has 4 quick stat boxes.

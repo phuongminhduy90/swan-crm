@@ -215,47 +215,7 @@ export default function CaseDetailPage() {
     }
   }
 
-  async function handleStatusChange(newStatus: string) {
-    if (!caseRecord || statusChanging) return;
-    setStatusChanging(true);
-    try {
-      await updateCaseStatus(caseId, newStatus as CaseRecord['status'], user?.id ?? 'dev-user');
-      await writeAuditLog({
-        actorId: user?.id ?? 'dev-user', actorName: user?.displayName ?? 'Dev',
-        actorRole: user?.role ?? 'admin', action: 'case_status_changed',
-        entityType: 'case', entityId: caseId,
-        before: { status: caseRecord.status }, after: { status: newStatus },
-      });
-      // Auto-create tasks based on status transition
-      try {
-        const { triggerAutoTasks } = await import('@/lib/tasks/auto-tasks');
-        await triggerAutoTasks(caseRecord, newStatus as CaseRecord['status'], user?.id ?? 'dev-user');
-      } catch (err) {
-        console.error('[CaseDetail] Auto-tasks trigger failed:', err);
-      }
-      // Auto-create follow-up tasks for post-op statuses
-      const POST_OP_STATUSES = ['completed', 'procedure_completed', 'post_op_followup'];
-      if (POST_OP_STATUSES.includes(newStatus)) {
-        try {
-          const { createPostOpFollowups } = await import('@/lib/firestore/followups');
-          const procedureDate = new Date();
-          await createPostOpFollowups(
-            caseId,
-            caseRecord.customerId,
-            procedureDate,
-            user?.id ?? 'dev-user',
-          );
-        } catch (err) {
-          console.error('[CaseDetail] Create post-op followups failed:', err);
-        }
-      }
-      reload();
-    } catch (err) {
-      console.error('[CaseDetail] Status change error:', err);
-    } finally {
-      setStatusChanging(false);
-    }
-  }
+  // Status change is handled by StatusWorkflow's onTransition callback below
 
   const {
     register: regService, handleSubmit: handleSubmitService, reset: resetServiceForm,
@@ -467,12 +427,13 @@ export default function CaseDetailPage() {
                   } catch (err) {
                     console.error('[CaseDetail] Auto-tasks trigger failed:', err);
                   }
-                  // Auto-create follow-up tasks for post-op statuses
-                  const POST_OP_STATUSES = ['completed', 'procedure_completed', 'post_op_followup'];
-                  if (POST_OP_STATUSES.includes(newStatus)) {
+                  // Auto-create post-op followups when case moves to procedure_completed
+                  if (newStatus === 'procedure_completed') {
                     try {
                       const { createPostOpFollowups } = await import('@/lib/firestore/followups');
-                      const procedureDate = new Date();
+                      const procedureDate = caseRecord.actualProcedureDate
+                        ? new Date(caseRecord.actualProcedureDate)
+                        : new Date();
                       await createPostOpFollowups(
                         caseId,
                         caseRecord.customerId,
