@@ -38,16 +38,22 @@ export async function getCase(id: string): Promise<CaseRecord | null> {
 
 export async function getAllCases(): Promise<CaseRecord[]> {
   const data = await getAllDocuments<Record<string, unknown>>(CASES_COLLECTION);
-  return (data as unknown as CaseRecord[]).sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-  );
+  return (data as unknown as CaseRecord[])
+    .filter((c) => c.active !== false) // exclude soft-deleted
+    .sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
 }
 
 export async function getCasesByCustomer(customerId: string): Promise<CaseRecord[]> {
   const data = await getAllDocuments<Record<string, unknown>>(CASES_COLLECTION, [
     { field: 'customerId', operator: '==', value: customerId },
   ]);
-  return data as unknown as CaseRecord[];
+  return (data as unknown as CaseRecord[])
+    .filter((c) => c.active !== false) // exclude soft-deleted
+    .sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
 }
 
 export async function createCase(

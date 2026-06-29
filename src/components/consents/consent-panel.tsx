@@ -134,7 +134,7 @@ export function ConsentPanel({
         actorId: user?.id ?? 'dev-user',
         actorName: user?.displayName ?? 'Dev User',
         actorRole: user?.role ?? 'admin',
-        action: 'consent_updated',
+        action: 'consent_created',
         entityType: 'consent',
         entityId: result.result.id,
         after: { consentType: values.consentType, consentStatus: 'pending' },

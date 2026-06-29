@@ -28,18 +28,23 @@ export function RevenueReport({ payments, cases, dateRange }: RevenueReportProps
   // Stats
   const stats = useMemo(() => {
     const confirmed = filteredPayments
-      .filter((p) => p.status === 'confirmed')
+      .filter((p) => p.status === 'confirmed' && p.paymentType !== 'refund')
       .reduce((sum, p) => sum + (p.amount ?? 0), 0);
     const pending = filteredPayments
-      .filter((p) => p.status === 'pending')
+      .filter((p) => p.status !== 'confirmed')
       .reduce((sum, p) => sum + (p.amount ?? 0), 0);
     const refund = filteredPayments
       .filter((p) => p.paymentType === 'refund')
       .reduce((sum, p) => sum + (p.amount ?? 0), 0);
-    const total = confirmed; // Tổng doanh thu = chỉ tính thanh toán đã xác nhận
-    const uniqueCaseIds = new Set(filteredPayments.map((p) => p.caseId));
-    const avgPerCase = uniqueCaseIds.size > 0 ? confirmed / uniqueCaseIds.size : 0;
-    return { total, confirmed, pending, refund, avgPerCase };
+    const total = confirmed; // Tổng doanh thu = chỉ tính thanh toán đã xác nhận (không bao gồm refund)
+    // Chỉ đếm cases có ít nhất 1 payment confirmed (không phải refund)
+    const confirmedCaseIds = new Set(
+      filteredPayments
+        .filter((p) => p.status === 'confirmed' && p.paymentType !== 'refund')
+        .map((p) => p.caseId)
+    );
+    const avgPerCase = confirmedCaseIds.size > 0 ? confirmed / confirmedCaseIds.size : 0;
+    return { total, confirmed, pending, refund, avgPerCase, confirmedCaseIds };
   }, [filteredPayments]);
 
   // Monthly trend
@@ -49,8 +54,13 @@ export function RevenueReport({ payments, cases, dateRange }: RevenueReportProps
       const key = getMonthKey(new Date(p.paymentDate));
       if (!map.has(key)) map.set(key, { confirmed: 0, pending: 0 });
       const entry = map.get(key)!;
-      if (p.status === 'confirmed') entry.confirmed += p.amount ?? 0;
-      else entry.pending += p.amount ?? 0;
+      // Không cộng refund vào confirmed
+      if (p.status === 'confirmed' && p.paymentType !== 'refund') {
+        entry.confirmed += p.amount ?? 0;
+      } else if (p.status !== 'confirmed') {
+        entry.pending += p.amount ?? 0;
+      }
+      // (refund confirmed không cộng vào đâu trong chart)
     }
     const sorted = Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
     return sorted.map(([key, val]) => ({
@@ -79,7 +89,7 @@ export function RevenueReport({ payments, cases, dateRange }: RevenueReportProps
 
   return (
     <div className="space-y-6">
-      <StatSummary stats={stats} caseCount={new Set(filteredPayments.map((p) => p.caseId)).size} />
+      <StatSummary stats={stats} caseCount={stats.confirmedCaseIds.size} />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <ChartCard title="Doanh thu theo tháng" icon={<TrendingUp className="h-5 w-5 text-swan-600" />} className="lg:col-span-2" minHeight={320}>

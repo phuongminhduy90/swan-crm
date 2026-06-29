@@ -78,13 +78,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [devRole]);
 
-  // Update dev profile when role changes (dev mode only)
-  useEffect(() => {
-    if (isDevMode) {
-      setUserProfile(MOCK_USERS[devRole]);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [devRole]);
 
   const value = useMemo(
     () => ({

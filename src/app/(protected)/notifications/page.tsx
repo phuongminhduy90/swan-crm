@@ -84,37 +84,49 @@ export default function NotificationsPage() {
   }, [load]);
 
   async function handleClick(n: Notification) {
-    if (!n.readBy?.includes(currentUserId)) {
-      await fetch(`/api/notifications/${n.id}/read`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: currentUserId }),
-      });
-      setNotifications((prev) =>
-        prev.map((x) =>
-          x.id === n.id
-            ? { ...x, readBy: [...(x.readBy ?? []), currentUserId] }
-            : x,
-        ),
-      );
-    }
-    if (n.caseId) {
-      router.push(`/cases/${n.caseId}`);
-    } else if (n.customerId) {
-      router.push(`/customers/${n.customerId}`);
+    try {
+      if (!n.readBy?.includes(currentUserId)) {
+        const res = await fetch(`/api/notifications/${n.id}/read`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: currentUserId }),
+        });
+        if (!res.ok) throw new Error('Mark read failed');
+        setNotifications((prev) =>
+          prev.map((x) =>
+            x.id === n.id
+              ? { ...x, readBy: [...(x.readBy ?? []), currentUserId] }
+              : x,
+          ),
+        );
+      }
+      if (n.caseId) {
+        router.push(`/cases/${n.caseId}`);
+      } else if (n.customerId) {
+        router.push(`/customers/${n.customerId}`);
+      }
+    } catch (err) {
+      console.error('Mark notification read error:', err);
+      toast('Không thể đánh dấu đã đọc', 'error');
     }
   }
 
   async function handleMarkAllRead() {
-    await fetch('/api/notifications/read-all', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: currentUserId }),
-    });
-    setNotifications((prev) =>
-      prev.map((x) => ({ ...x, readBy: [...(x.readBy ?? []), currentUserId] })),
-    );
-    toast('Đã đánh dấu tất cả là đã đọc', 'success');
+    try {
+      const res = await fetch('/api/notifications/read-all', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: currentUserId }),
+      });
+      if (!res.ok) throw new Error('Mark all read failed');
+      setNotifications((prev) =>
+        prev.map((x) => ({ ...x, readBy: [...(x.readBy ?? []), currentUserId] })),
+      );
+      toast('Đã đánh dấu tất cả là đã đọc', 'success');
+    } catch (err) {
+      console.error('Mark all read error:', err);
+      toast('Không thể cập nhật trạng thái đọc', 'error');
+    }
   }
 
   const filtered = notifications.filter((n) => {

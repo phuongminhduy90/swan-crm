@@ -85,11 +85,17 @@ export async function rejectPayment(
   rejectionNote: string,
   updatedBy: string,
 ): Promise<void> {
+  const payment = await getPayment(paymentId);
+  if (!payment) throw new Error('Không tìm thấy thanh toán');
+
   await updateDocument(COLLECTION, paymentId, {
     status: 'rejected',
     note: rejectionNote,
     updatedBy,
   });
+
+  // Recalculate case payment totals after rejection
+  await recalculateCasePayment(payment.caseId, updatedBy);
 }
 
 async function recalculateCasePayment(caseId: string, updatedBy: string): Promise<void> {

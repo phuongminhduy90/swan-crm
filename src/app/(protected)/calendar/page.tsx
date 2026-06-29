@@ -14,6 +14,7 @@ import { Modal } from '@/components/ui/modal';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
+import { useToast } from '@/components/ui/toast';
 import { formatDateVN } from '@/lib/utils/format';
 import { cn } from '@/lib/utils/cn';
 
@@ -89,6 +90,7 @@ function formatTime(iso: string): string {
 
 export default function CalendarPage() {
   const { user: currentUser } = useCurrentUser();
+  const { toast } = useToast();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [allUsers, setAllUsers] = useState<UserType[]>([]);
   const [loading, setLoading] = useState(true);
@@ -207,6 +209,7 @@ export default function CalendarPage() {
       await load();
     } catch (err) {
       console.error('[Calendar] Create appointment error:', err);
+      toast('Không thể tạo lịch hẹn. Vui lòng thử lại.', 'error');
     } finally {
       setCreating(false);
     }
@@ -430,7 +433,10 @@ export default function CalendarPage() {
       {/* Create appointment modal */}
       <Modal
         open={createOpen}
-        onClose={() => setCreateOpen(false)}
+        onClose={() => {
+          setCreateOpen(false);
+          setCreateForm({ caseId: '', customerId: '', type: 'consultation', title: '', startTime: '', endTime: '', note: '' });
+        }}
         title="Tạo lịch hẹn mới"
         description="Điền thông tin để tạo lịch hẹn"
         size="lg"

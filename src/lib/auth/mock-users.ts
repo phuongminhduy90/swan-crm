@@ -21,6 +21,7 @@ export const MOCK_USERS: Record<UserRole, User> = ALL_ROLES.reduce(
   {} as Record<UserRole, User>,
 );
 
-export function getMockUserByRole(role: UserRole): User {
-  return MOCK_USERS[role];
-}
+// NOTE: getMockUserByRole is dead code — not used anywhere. Commented out.
+// export function getMockUserByRole(role: UserRole): User {
+//   return MOCK_USERS[role];
+// }

@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -136,7 +136,12 @@ export default function FollowupsPage() {
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const todayStr = today.toISOString().slice(0, 10);
+  // Dùng local date (VN time) thay vì toISOString() (UTC) để tránh lệch ngày
+  const todayStr = [
+    today.getFullYear(),
+    String(today.getMonth() + 1).padStart(2, '0'),
+    String(today.getDate()).padStart(2, '0'),
+  ].join('-');
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
 

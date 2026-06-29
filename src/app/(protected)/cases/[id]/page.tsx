@@ -588,7 +588,6 @@ export default function CaseDetailPage() {
           </div>
           <AttachmentList
             caseId={caseId}
-            customerId={caseRecord.customerId}
             canWrite={canWrite}
             canChangeVisibility={canWrite}
             refreshKey={refreshKey}

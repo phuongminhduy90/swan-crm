@@ -40,11 +40,16 @@ export function UsersTable({ onEdit, refreshTrigger = 0 }: UsersTableProps) {
   const handleToggleActive = useCallback(
     async (user: User) => {
       try {
-        await fetch(`/api/users/${user.id}`, {
+        const res = await fetch(`/api/users/${user.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ isActive: !user.isActive }),
         });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          console.error('Toggle active error:', err);
+          return;
+        }
         fetchUsers();
       } catch (err) {
         console.error('Toggle active error:', err);

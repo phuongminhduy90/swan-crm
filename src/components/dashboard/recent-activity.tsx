@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Activity, Briefcase, User as UserIcon, CreditCard } from 'lucide-react';
+import { Activity, Briefcase, User as UserIcon } from 'lucide-react';
+
 import { getAllCases, getAllCustomers } from '@/lib/firestore';
 import { CaseRecord, Customer } from '@/lib/types';
 import { CASE_STATUS_LABELS, CASE_STATUS_COLORS } from '@/constants/case-status';

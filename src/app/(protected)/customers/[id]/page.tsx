@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import {
   getCustomer, getCasesByCustomer, updateCustomer, deleteCustomer, requestCustomerDeletion,
-  approveCustomerDeletion, writeAuditLog,
+  approveCustomerDeletion, rejectCustomerDeletion, writeAuditLog,
 } from '@/lib/firestore';
 import { Customer, CaseRecord, PrivacyLevel, User as UserType, Followup, FollowupStatus } from '@/lib/types';
 import { getAllUsers } from '@/lib/firestore/users';
@@ -118,6 +118,7 @@ export default function CustomerDetailPage() {
   const [requesting, setRequesting] = useState(false);
   const [approveDelete, setApproveDelete] = useState(false);
   const [approving, setApproving] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
   const [followups, setFollowups] = useState<Followup[]>([]);
   const [followupsLoading, setFollowupsLoading] = useState(false);
 
@@ -249,6 +250,23 @@ export default function CustomerDetailPage() {
     }
   }
 
+  // ── Reject Delete ─────────────────────────────────────────────────────────
+  async function handleRejectDelete() {
+    if (!customer || !user) return;
+    setRejecting(true);
+    try {
+      await rejectCustomerDeletion(customer.id);
+      toast('Đã từ chối yêu cầu xóa', 'info');
+      const updated = await getCustomer(customer.id);
+      if (updated) setCustomer(updated);
+    } catch (err) {
+      console.error('[CustomerDetail] Reject delete failed:', err);
+      toast('Không thể từ chối yêu cầu xóa', 'error');
+    } finally {
+      setRejecting(false);
+    }
+  }
+
   // ── Approve Delete ────────────────────────────────────────────────────────
   async function handleApproveDelete() {
     if (!customer || !user) return;
@@ -329,7 +347,8 @@ export default function CustomerDetailPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setRequestDelete(false)}
+                  isLoading={rejecting}
+                  onClick={handleRejectDelete}
                 >
                   Từ chối
                 </Button>

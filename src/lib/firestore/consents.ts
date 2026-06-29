@@ -47,9 +47,17 @@ export async function updateConsentStatus(
   status: Consent['consentStatus'],
   signedBy?: string,
 ): Promise<void> {
-  await updateDocument(COLLECTION, id, {
+  const updateData: Record<string, unknown> = {
     consentStatus: status,
-    signedBy,
-    signedAt: status === 'granted' ? new Date().toISOString() : undefined,
-  });
+    updatedAt: new Date().toISOString(),
+  };
+  if (signedBy !== undefined) {
+    updateData.signedBy = signedBy;
+  }
+  if (status === 'granted') {
+    updateData.signedAt = new Date().toISOString();
+  }
+  // Không truyền signedAt khi denied/revoked — giữ nguyên giá trị cũ trong Firestore
+  await updateDocument(COLLECTION, id, updateData);
 }
+

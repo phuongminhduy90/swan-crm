@@ -10,6 +10,7 @@ import { Briefcase, TrendingUp } from 'lucide-react';
 
 export default function DashboardPage() {
   const [cases, setCases] = useState<CaseRecord[]>([]);
+  const [casesLoading, setCasesLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -19,6 +20,8 @@ export default function DashboardPage() {
         if (!cancelled) setCases(data);
       } catch (err) {
         console.error('[Dashboard] Failed to load cases:', err);
+      } finally {
+        if (!cancelled) setCasesLoading(false);
       }
     }
     load();
@@ -31,10 +34,10 @@ export default function DashboardPage() {
   const inFollowup = cases.filter((c) => c.status.startsWith('post_op_')).length;
 
   const cards = [
-    { label: 'CASE mới', value: newCases, color: 'bg-swan-100 text-swan-700' },
-    { label: 'Chờ thanh toán', value: waitingPayment, color: 'bg-amber-100 text-amber-700' },
-    { label: 'Chờ bệnh viện', value: waitingHospital, color: 'bg-cyan-100 text-cyan-700' },
-    { label: 'Đang theo dõi', value: inFollowup, color: 'bg-pink-100 text-pink-700' },
+    { label: 'CASE mới', value: casesLoading ? '...' : newCases, textColor: 'text-swan-700', bg: 'bg-swan-50' },
+    { label: 'Chờ thanh toán', value: casesLoading ? '...' : waitingPayment, textColor: 'text-amber-700', bg: 'bg-amber-50' },
+    { label: 'Chờ bệnh viện', value: casesLoading ? '...' : waitingHospital, textColor: 'text-cyan-700', bg: 'bg-cyan-50' },
+    { label: 'Đang theo dõi', value: casesLoading ? '...' : inFollowup, textColor: 'text-pink-700', bg: 'bg-pink-50' },
   ];
 
   return (
@@ -64,7 +67,7 @@ export default function DashboardPage() {
                 className="group rounded-xl border border-gray-100/80 bg-gray-50/50 p-3.5 transition-all hover:bg-white hover:shadow-soft hover:border-swan-100"
               >
                 <p className="text-xs font-medium text-gray-500">{c.label}</p>
-                <p className={`mt-1.5 text-2xl font-bold tabular-nums ${c.color.split(' ')[1]}`}>{c.value}</p>
+                <p className={`mt-1.5 text-2xl font-bold tabular-nums ${c.textColor}`}>{c.value}</p>
               </Link>
             ))}
           </div>

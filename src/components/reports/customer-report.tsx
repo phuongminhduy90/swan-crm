@@ -43,7 +43,7 @@ export function CustomerReport({ customers, dateRange }: CustomerReportProps) {
     return Array.from(map.entries()).map(([level, count]) => ({ level, count }));
   }, [filteredCustomers]);
 
-  // New customers per month (based on ALL customers for proper trend)
+  // Khách mới theo tháng — dùng filteredCustomers khi dateRange > 0
   const monthlyData: NewCustomersPoint[] = useMemo(() => {
     const map = new Map<string, number>();
     const sourceCustomers = dateRange === 0 ? customers : filteredCustomers;

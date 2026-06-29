@@ -10,13 +10,6 @@ interface PipelineFunnelProps {
   data: PipelineDatum[];
 }
 
-const STAGE_COLORS: Record<PipelineStageKey, string> = {
-  draft: 'bg-gray-200 text-gray-700',
-  confirmed: 'bg-swan-200 text-swan-800',
-  scheduled: 'bg-swan-400 text-white',
-  in_procedure: 'bg-champagne-400/60 text-champagne-700',
-  post_op: 'bg-emerald-100 text-emerald-700',
-};
 
 const STAGE_BG_GRADIENTS: Record<PipelineStageKey, string> = {
   draft: 'from-gray-100 to-gray-200',

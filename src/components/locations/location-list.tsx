@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Pencil, MapPin } from 'lucide-react';
+import { Pencil, MapPin, PowerOff, CheckCircle } from 'lucide-react';
 import { TreatmentLocation } from '@/lib/types';
 import { getAllTreatmentLocations, updateTreatmentLocation } from '@/lib/firestore';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
@@ -65,11 +65,15 @@ export function LocationListTable({ refresh, onEdit }: Props) {
     if (!confirmDeactivate) return;
     setDeactivating(true);
     try {
-      await updateTreatmentLocation(confirmDeactivate.id, { active: false, updatedAt: new Date().toISOString() });
+      // Toggle: deactivate if active, activate if inactive
+      await updateTreatmentLocation(confirmDeactivate.id, {
+        active: !confirmDeactivate.active,
+        updatedAt: new Date().toISOString(),
+      });
       setConfirmDeactivate(null);
       await load();
     } catch (err) {
-      console.error('[LocationList] Deactivate error:', err);
+      console.error('[LocationList] Deactivate/Activate error:', err);
     } finally {
       setDeactivating(false);
     }
@@ -115,7 +119,7 @@ export function LocationListTable({ refresh, onEdit }: Props) {
     {
       key: 'actions',
       header: '',
-      className: 'w-24 text-right',
+      className: 'w-32 text-right',
       render: (row: TreatmentLocation) =>
         canWrite ? (
           <div className="flex items-center justify-end gap-2">
@@ -126,6 +130,25 @@ export function LocationListTable({ refresh, onEdit }: Props) {
             >
               <Pencil className="h-4 w-4" />
             </button>
+            {row.active ? (
+              <button
+                onClick={(e) => { e.stopPropagation(); setConfirmDeactivate(row); }}
+                className="rounded-lg p-1.5 text-red-400 hover:bg-red-50 hover:text-red-600"
+                aria-label="Ngưng hoạt động"
+                title="Ngưng hoạt động"
+              >
+                <PowerOff className="h-4 w-4" />
+              </button>
+            ) : (
+              <button
+                onClick={(e) => { e.stopPropagation(); setConfirmDeactivate(row); }}
+                className="rounded-lg p-1.5 text-green-500 hover:bg-green-50 hover:text-green-700"
+                aria-label="Kích hoạt"
+                title="Kích hoạt"
+              >
+                <CheckCircle className="h-4 w-4" />
+            </button>
+            )}
           </div>
         ) : null,
     },
@@ -161,10 +184,14 @@ export function LocationListTable({ refresh, onEdit }: Props) {
 
       <ConfirmDialog
         open={!!confirmDeactivate}
-        title="Ngừng địa điểm?"
-        description={`Địa điểm "${confirmDeactivate?.name}" sẽ bị ẩn khỏi danh sách.`}
-        confirmLabel="Ngừng hoạt động"
-        variant="danger"
+        title={confirmDeactivate?.active ? 'Ngừng địa điểm?' : 'Kích hoạt địa điểm?'}
+        description={
+          confirmDeactivate?.active
+            ? `Địa điểm "${confirmDeactivate?.name}" sẽ bị ẩn khỏi danh sách.`
+            : `Địa điểm "${confirmDeactivate?.name}" sẽ được kích hoạt trở lại.`
+        }
+        confirmLabel={confirmDeactivate?.active ? 'Ngừng hoạt động' : 'Kích hoạt'}
+        variant={confirmDeactivate?.active ? 'danger' : 'default'}
         loading={deactivating}
         onConfirm={handleDeactivate}
         onClose={() => setConfirmDeactivate(null)}

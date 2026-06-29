@@ -106,6 +106,8 @@ export function TaskList({ refresh, onRefresh }: Props) {
       await updateTaskStatus(task.id, 'done', userProfile.id);
       await load();
       onRefresh?.();
+    } catch (err) {
+      console.error('[TaskList] Mark done error:', err);
     } finally {
       setMarking(null);
     }

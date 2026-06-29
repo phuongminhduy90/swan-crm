@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Attachment, AttachmentVisibility } from '@/lib/types';
-import { getAttachmentsByCase, updateAttachmentVisibility, deleteAttachment } from '@/lib/firestore/attachments';
+import { getAttachmentsByCase, updateAttachmentVisibility } from '@/lib/firestore/attachments';
 import { ATTACHMENT_TYPE_LABELS, ATTACHMENT_VISIBILITY_LABELS, ATTACHMENT_VISIBILITIES } from '@/lib/validators/attachment';
 import { writeAuditLog } from '@/lib/firestore/audit';
 import { useToast } from '@/components/ui/toast';
@@ -19,7 +19,6 @@ import {
 
 interface AttachmentListProps {
   caseId: string;
-  customerId: string;
   canWrite: boolean;
   canChangeVisibility: boolean;
   refreshKey?: number;
@@ -102,15 +101,9 @@ export function AttachmentList({
     if (!deleteId) return;
     try {
       setDeleting(true);
-      await deleteAttachment(deleteId);
-      await writeAuditLog({
-        actorId: user?.id ?? 'dev-user',
-        actorName: user?.displayName ?? 'Dev User',
-        actorRole: user?.role ?? 'admin',
-        action: 'attachment_uploaded',
-        entityType: 'attachment',
-        entityId: deleteId,
-      });
+      // Use API route — it handles deletion + audit log internally
+      const res = await fetch(`/api/attachments/${deleteId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Delete failed');
       toast('Đã xóa file đính kèm', 'success');
       setDeleteId(null);
       await load();

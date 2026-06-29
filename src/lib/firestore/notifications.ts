@@ -3,6 +3,7 @@ import {
   setDocument,
   updateDocument,
   getAllDocuments,
+  getDocument,
 } from '@/lib/firebase/firestore';
 
 const COLLECTION = 'notifications';
@@ -50,13 +51,15 @@ export async function markNotificationRead(
   notificationId: string,
   userId: string,
 ): Promise<void> {
-  const all = await getAllNotifications();
-  const notif = all.find((n) => n.id === notificationId);
+  const notif = await getDocument<Record<string, unknown>>(COLLECTION, notificationId);
   if (!notif) return;
-
-  const readBy = [...(notif.readBy ?? [])];
-  if (!readBy.includes(userId)) readBy.push(userId);
-  await updateDocument(COLLECTION, notificationId, { readBy });
+  const readBy: string[] = (notif.readBy as string[] | undefined) ?? [];
+  if (!readBy.includes(userId)) {
+    await updateDocument(COLLECTION, notificationId, {
+      readBy: [...readBy, userId],
+      status: 'read',
+    });
+  }
 }
 
 export async function markNotificationSent(id: string): Promise<void> {

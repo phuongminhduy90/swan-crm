@@ -136,7 +136,11 @@ export async function evaluatePreProcedureChecklist(
     {
       key: 'doctor_approved',
       label: 'Bác sĩ đã duyệt',
-      passed: Boolean(staffAssignment?.doctorId),
+      passed: Boolean(staffAssignment?.doctorId) &&
+        ['medically_approved', 'scheduled', 'reminder_sent', 'checked_in',
+          'in_procedure', 'procedure_completed', 'waiting_images_upload',
+          'post_op_d1', 'post_op_d3', 'post_op_d7', 'post_op_d14', 'post_op_d30', 'post_op_d90',
+          'completed'].includes(caseRecord.status),
       required: true,
     },
     {

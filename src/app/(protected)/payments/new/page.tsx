@@ -69,14 +69,14 @@ export default function NewPaymentPage() {
     setSubmitting(true);
     setError(null);
     try {
-      await createPayment(data, user?.id ?? 'dev-user');
+      const newPayment = await createPayment(data, user?.id ?? 'dev-user');
       await writeAuditLog({
         actorId: user?.id ?? 'dev-user',
         actorName: user?.displayName ?? 'Dev',
         actorRole: user?.role ?? 'admin',
         action: 'payment_created',
         entityType: 'payment',
-        entityId: selectedCase.id,
+        entityId: newPayment.id,
         after: data as unknown as Record<string, unknown>,
       });
       router.push('/payments');

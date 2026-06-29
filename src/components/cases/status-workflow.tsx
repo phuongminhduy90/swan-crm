@@ -16,7 +16,7 @@ interface Props {
 
 export function StatusWorkflow({ currentStatus, onTransition, loading = false }: Props) {
   const [confirmTarget, setConfirmTarget] = useState<CaseStatus | null>(null);
-  const [transitioning, setTransitioning] = useState(false);
+  const [transitioningTo, setTransitioningTo] = useState<string | null>(null);
 
   const allowedTransitions = CASE_STATUS_TRANSITIONS[currentStatus] ?? [];
 
@@ -30,14 +30,14 @@ export function StatusWorkflow({ currentStatus, onTransition, loading = false }:
 
   async function handleConfirm() {
     if (!confirmTarget) return;
-    setTransitioning(true);
+    setTransitioningTo(confirmTarget);
     try {
       await onTransition(confirmTarget);
       setConfirmTarget(null);
     } catch (err) {
       console.error('[StatusWorkflow] Transition error:', err);
     } finally {
-      setTransitioning(false);
+      setTransitioningTo(null);
     }
   }
 
@@ -73,7 +73,8 @@ export function StatusWorkflow({ currentStatus, onTransition, loading = false }:
                 key={s}
                 variant="outline"
                 size="sm"
-                isLoading={loading || transitioning}
+                isLoading={loading || transitioningTo === s}
+                disabled={loading || !!transitioningTo}
                 onClick={() => setConfirmTarget(s)}
                 leftIcon={<ArrowRight className="h-3.5 w-3.5" />}
               >
@@ -97,7 +98,8 @@ export function StatusWorkflow({ currentStatus, onTransition, loading = false }:
                 key={s}
                 variant="outline"
                 size="sm"
-                isLoading={loading || transitioning}
+                isLoading={loading || transitioningTo === s}
+                disabled={loading || !!transitioningTo}
                 onClick={() => setConfirmTarget(s)}
                 className="border-amber-300 text-amber-700 hover:bg-amber-50 hover:text-amber-800"
               >
@@ -123,7 +125,7 @@ export function StatusWorkflow({ currentStatus, onTransition, loading = false }:
           </span>
         }
         confirmLabel="Xác nhận"
-        loading={transitioning}
+        loading={!!transitioningTo}
         onConfirm={handleConfirm}
         onClose={() => setConfirmTarget(null)}
       />

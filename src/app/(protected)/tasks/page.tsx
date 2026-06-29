@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Plus, ClipboardList } from 'lucide-react';
 import { Task } from '@/lib/types';
 import { createTask, getAllTasks } from '@/lib/firestore';
@@ -28,6 +28,11 @@ export default function TasksPage() {
       })
       .catch(() => {});
   }, []);
+
+  // Load pending count on mount
+  useEffect(() => {
+    handleRefresh();
+  }, [handleRefresh]);
 
   const handleSubmit = async (data: {
     title: string;

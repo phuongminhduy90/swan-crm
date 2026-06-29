@@ -126,9 +126,8 @@ export default function PaymentsPage() {
         </div>
 
         <div className="p-4">
-          {/* For refund tab, we show a message since refund is a paymentType not a status */}
           {activeTab === 'refund' ? (
-            <PaymentList key={listKey} refresh={refresh} />
+            <PaymentList key={listKey} paymentTypeFilter="refund" refresh={refresh} />
           ) : (
             <PaymentList
               key={listKey}

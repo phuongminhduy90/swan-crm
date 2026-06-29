@@ -30,6 +30,7 @@ const AUDIT_ACTION_LABELS: Record<AuditAction, { label: string; icon: React.Elem
   attachment_uploaded: { label: 'Upload file', icon: Upload, color: 'text-swan-600 bg-swan-50' },
   attachment_deleted: { label: 'Xóa file đính kèm', icon: Trash2, color: 'text-red-600 bg-red-50' },
   attachment_visibility_changed: { label: 'Đổi quyền xem file', icon: Shield, color: 'text-purple-600 bg-purple-50' },
+  consent_created: { label: 'Tạo consent', icon: Shield, color: 'text-teal-600 bg-teal-50' },
   consent_updated: { label: 'Cập nhật consent', icon: Shield, color: 'text-teal-600 bg-teal-50' },
   staff_assignment_changed: { label: 'Phân công nhân sự', icon: Users, color: 'text-indigo-600 bg-indigo-50' },
   task_completed: { label: 'Hoàn thành task', icon: CheckCircle2, color: 'text-emerald-600 bg-emerald-50' },
@@ -202,7 +203,7 @@ export default function AuditLogsPage() {
                         </span>
                         <span className="mx-1">·</span>
                         <Badge variant="default">
-                          {ENTITY_TYPE_LABELS[log.entityType]}
+                          {ENTITY_TYPE_LABELS[log.entityType] ?? log.entityType}
                         </Badge>
                         <code className="ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-700">
                           {log.entityId}

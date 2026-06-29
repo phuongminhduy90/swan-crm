@@ -109,7 +109,10 @@ export async function triggerAutoTasks(
         customerId,
         department: 'sales',
         priority: 'high',
-        dueDate: caseRecord.expectedProcedureDate ?? tomorrowISO,
+        // 1 ngày trước ngày PT để có thời gian nhắc
+        dueDate: caseRecord.expectedProcedureDate
+          ? new Date(new Date(caseRecord.expectedProcedureDate).getTime() - 24 * 60 * 60 * 1000).toISOString()
+          : tomorrowISO,
       });
       break;
 

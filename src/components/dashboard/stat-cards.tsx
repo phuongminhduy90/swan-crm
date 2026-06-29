@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+
 import { Users, FolderOpen, TrendingUp, Calendar } from 'lucide-react';
 import { getAllCustomers, getAllCases, getAllPayments, getAllAppointments } from '@/lib/firestore';
 import { cn } from '@/lib/utils/cn';
@@ -17,7 +18,9 @@ interface Stat {
 }
 
 export function StatCards() {
+  const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<Stat[]>([
+
     { label: 'Khách hàng', value: '...', hint: 'Tổng số khách hàng', icon: Users, bg: 'bg-swan-100', color: 'text-swan-700', gradient: 'from-swan-500 to-swan-600' },
     { label: 'CASE đang xử lý', value: '...', hint: 'CASE chưa hoàn tất', icon: FolderOpen, bg: 'bg-champagne-400/20', color: 'text-champagne-600', gradient: 'from-champagne-400 to-champagne-500' },
     { label: 'Doanh thu tháng', value: '...', hint: 'Đã xác nhận trong tháng', icon: TrendingUp, bg: 'bg-emerald-100', color: 'text-emerald-700', gradient: 'from-emerald-500 to-emerald-600' },
@@ -68,6 +71,8 @@ export function StatCards() {
         ]);
       } catch (err) {
         console.error('[StatCards] Failed to load:', err);
+        setError('Không thể tải dữ liệu');
+        setStats((prev) => prev.map((s) => ({ ...s, value: 'Lỗi' })));
       }
     }
     load();

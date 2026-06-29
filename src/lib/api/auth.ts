@@ -62,8 +62,8 @@ async function resolveUser(request: NextRequest): Promise<ApiUser | null> {
     // Fallback: use hardcoded dev user map
     const role = DEV_USER_ROLE_MAP[userId];
     if (!role) {
-      // Unknown userId in dev mode — default to admin for convenience
-      return { uid: 'user-001', role: 'admin', email: 'admin@swanclinic.vn', displayName: 'Dev Admin', isActive: true };
+      console.warn(`[auth] Dev mode: unknown userId '${userId}', returning null`);
+      return null;
     }
     return {
       uid: userId,

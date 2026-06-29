@@ -15,7 +15,7 @@ import type { UserRole } from '@/lib/types';
 const createUserSchema = z.object({
   displayName: z.string().min(2, 'Tên phải có ít nhất 2 ký tự'),
   email: z.string().email('Email không hợp lệ'),
-  password: z.string().min(6, 'Mật khẩu phải có ít nhất 6 ký tự'),
+  password: z.string().min(8, 'Mật khẩu phải có ít nhất 8 ký tự'),
   role: z.string().min(1, 'Vui lòng chọn vai trò'),
   phone: z.string().optional(),
 });
@@ -147,7 +147,7 @@ export function CreateUserDialog({ open, onClose, onCreated }: CreateUserDialogP
             label="Mật khẩu"
             type="password"
             placeholder="••••••••"
-            hint="Tối thiểu 6 ký tự"
+            hint="Tối thiểu 8 ký tự"
             error={errors.password?.message}
             {...register('password')}
           />

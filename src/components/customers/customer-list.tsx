@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Pencil, Trash2, Users, Clock, XCircle } from 'lucide-react';
 import {
   getAllCustomers, requestCustomerDeletion, approveCustomerDeletion, rejectCustomerDeletion,
+  deleteCustomer,
 } from '@/lib/firestore';
 import { getAllUsers } from '@/lib/firestore/users';
 import { Customer, CustomerSource, PrivacyLevel, User as UserType } from '@/lib/types';
@@ -145,6 +146,7 @@ export function CustomerList({ refresh, onEdit }: Props) {
     setApproving(true);
     try {
       await approveCustomerDeletion(confirmApprove.id, user.id);
+      await deleteCustomer(confirmApprove.id);
       toast(`Đã phê duyệt xóa khách hàng ${confirmApprove.fullName}`, 'success');
       setConfirmApprove(null);
       await load();

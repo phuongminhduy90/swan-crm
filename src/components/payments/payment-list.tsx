@@ -29,10 +29,11 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
 interface Props {
   caseId?: string;
   statusFilter?: Payment['status'];
+  paymentTypeFilter?: string;
   refresh?: number;
 }
 
-export function PaymentList({ caseId, statusFilter, refresh }: Props) {
+export function PaymentList({ caseId, statusFilter, paymentTypeFilter, refresh }: Props) {
   const { userProfile } = useAuth();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,14 +48,17 @@ export function PaymentList({ caseId, statusFilter, refresh }: Props) {
       setLoading(true);
       setError(null);
       const data = caseId ? await getPaymentsByCase(caseId) : await getAllPayments();
-      const filtered = statusFilter ? data.filter((p) => p.status === statusFilter) : data;
+      let filtered = statusFilter ? data.filter((p) => p.status === statusFilter) : data;
+      if (paymentTypeFilter) {
+        filtered = filtered.filter((p) => p.paymentType === paymentTypeFilter);
+      }
       setPayments(filtered);
     } catch {
       setError('Không thể tải danh sách thanh toán');
     } finally {
       setLoading(false);
     }
-  }, [caseId, statusFilter]);
+  }, [caseId, statusFilter, paymentTypeFilter]);
 
   useEffect(() => {
     load();
@@ -62,20 +66,28 @@ export function PaymentList({ caseId, statusFilter, refresh }: Props) {
 
   const handleConfirm = async (note?: string) => {
     if (!confirmingPayment || !userProfile) return;
-    await confirmPayment(
-      confirmingPayment.id,
-      { confirmedBy: userProfile.id, note },
-      userProfile.id,
-    );
-    setConfirmingPayment(null);
-    await load();
+    try {
+      await confirmPayment(
+        confirmingPayment.id,
+        { confirmedBy: userProfile.id, note },
+        userProfile.id,
+      );
+      setConfirmingPayment(null);
+      await load();
+    } catch (err) {
+      console.error('[PaymentList] Confirm error:', err);
+    }
   };
 
   const handleReject = async (note: string) => {
     if (!confirmingPayment || !userProfile) return;
-    await rejectPayment(confirmingPayment.id, note, userProfile.id);
-    setConfirmingPayment(null);
-    await load();
+    try {
+      await rejectPayment(confirmingPayment.id, note, userProfile.id);
+      setConfirmingPayment(null);
+      await load();
+    } catch (err) {
+      console.error('[PaymentList] Reject error:', err);
+    }
   };
 
   const statusBadge = (status: Payment['status']) => {

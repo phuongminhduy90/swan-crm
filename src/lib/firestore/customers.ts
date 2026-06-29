@@ -33,7 +33,7 @@ async function checkPhoneExists(
   phone: string,
   excludeId?: string,
 ): Promise<boolean> {
-  const all = await getAllCustomers();
+  const all = await getAllCustomersIncludingPending();
   return all.some(
     (c) => c.phone === phone && c.id !== excludeId,
   );
@@ -126,7 +126,7 @@ export async function updateCustomer(
       throw new Error(`Số điện thoại ${input.phone} đã tồn tại trong hệ thống`);
     }
   }
-  await updateDocument(COLLECTION, id, { ...input, updatedBy });
+  await updateDocument(COLLECTION, id, { ...input, updatedBy, updatedAt: new Date().toISOString() });
 }
 
 /**

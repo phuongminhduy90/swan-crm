@@ -81,6 +81,9 @@ export interface CaseRecord {
   updatedBy?: string;
   createdAt: string;
   updatedAt: string;
+
+  /** Soft-delete flag — false khi bị cascade-delete từ customer deletion */
+  active?: boolean;
 }
 
 export interface CreateCaseInput {

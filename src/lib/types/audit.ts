@@ -13,6 +13,7 @@ export type AuditAction =
   | 'attachment_uploaded'
   | 'attachment_deleted'
   | 'attachment_visibility_changed'
+  | 'consent_created'
   | 'consent_updated'
   | 'staff_assignment_changed'
   | 'task_completed'

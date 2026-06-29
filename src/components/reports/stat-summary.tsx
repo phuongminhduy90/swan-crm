@@ -1,3 +1,4 @@
+import type { ElementType } from 'react';
 import { Wallet, CheckCircle2, Clock, TrendingUp } from 'lucide-react';
 import { formatVNDCompact } from '@/lib/utils/format';
 import { cn } from '@/lib/utils/cn';
@@ -19,7 +20,7 @@ interface StatRow {
   label: string;
   value: string;
   hint: string;
-  icon: React.ElementType;
+  icon: ElementType;
   bg: string;
   color: string;
 }
