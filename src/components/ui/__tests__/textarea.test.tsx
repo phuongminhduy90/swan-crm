@@ -37,7 +37,7 @@ describe('Textarea (A.4)', () => {
   describe('aria attributes', () => {
     it('sets aria-required="true" when required is true and omits it when false', () => {
       const { rerender } = render(<Textarea label="Lý do" required />);
-      const ta = screen.getByLabelText('Lý do');
+      const ta = screen.getByLabelText(/Lý do/);
       expect(ta).toHaveAttribute('aria-required', 'true');
 
       rerender(<Textarea label="Lý do" />);
@@ -86,8 +86,7 @@ describe('Textarea (A.4)', () => {
       render(<Textarea id="custom-id" label="Ghi chú" />);
       const ta = screen.getByLabelText('Ghi chú');
       expect(ta.id).toBe('custom-id');
-      expect(ta).toHaveAttribute('aria-describedby'); // auto hint id when no error/hint
-      // When no error/hint, no aria-describedby is set
+      // When no error/hint is provided, aria-describedby is not set.
       expect(ta).not.toHaveAttribute('aria-describedby');
     });
 
