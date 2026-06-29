@@ -2,7 +2,7 @@
 
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Loader2 } from 'lucide-react';
+import { Loader2, CreditCard } from 'lucide-react';
 import {
   createCustomerSchema,
   CreateCustomerFormValues,
@@ -13,6 +13,8 @@ import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
+import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
+import { SENSITIVE_FIELD_ACCESS_ROLES } from '@/constants/permissions';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -52,6 +54,13 @@ export function CustomerForm({
   onCancel,
   loading = false,
 }: CustomerFormProps) {
+  const { user } = useCurrentUser();
+  // Story B.1.1 (F-CRIT-02): CCCD section is gated by role. Roles without access
+  // (accountant, nurse, cskh_postop, media, …) cannot view or edit CCCD fields.
+  // When the section is hidden, the existing initialData values still flow through
+  // unchanged so an edit by an unauthorized role never wipes the persisted CCCD.
+  const canViewSensitive = !!user && SENSITIVE_FIELD_ACCESS_ROLES.includes(user.role);
+
   const {
     register,
     control,
@@ -153,7 +162,41 @@ export function CustomerForm({
         </div>
       </FormSection>
 
-      {/* ── 2. Liên hệ & Mạng xã hội ───────────────────────────────────── */}
+      {/* ── 2. Giấy tờ tùy thân (CCCD/CMND) — RBAC gated (B.1.1) ──────────── */}
+      {canViewSensitive && (
+        <FormSection title="Giấy tờ tùy thân">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Input
+              label="Số CMND/CCCD"
+              placeholder="9 số (CMND) hoặc 12 số (CCCD)"
+              inputMode="numeric"
+              hint="Để trống nếu khách chưa cung cấp"
+              error={errors.nationalIdNumber?.message}
+              {...register('nationalIdNumber')}
+            />
+            <Input
+              label="Ngày cấp"
+              type="date"
+              error={errors.nationalIdIssueDate?.message}
+              {...register('nationalIdIssueDate')}
+            />
+            <div className="sm:col-span-2">
+              <Input
+                label="Nơi cấp"
+                placeholder="Công an tỉnh/TP..."
+                error={errors.nationalIdIssuePlace?.message}
+                {...register('nationalIdIssuePlace')}
+              />
+            </div>
+          </div>
+          <p className="flex items-center gap-1.5 text-xs text-gray-400">
+            <CreditCard className="h-3.5 w-3.5" />
+            Thông tin chỉ hiển thị cho vai trò được phép truy cập giấy tờ nhạy cảm.
+          </p>
+        </FormSection>
+      )}
+
+      {/* ── 3. Liên hệ & Mạng xã hội ───────────────────────────────────── */}
       <FormSection title="Liên hệ & Mạng xã hội">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Input
@@ -179,7 +222,7 @@ export function CustomerForm({
         </div>
       </FormSection>
 
-      {/* ── 3. Người liên hệ khẩn cấp ──────────────────────────────────── */}
+      {/* ── 4. Người liên hệ khẩn cấp ──────────────────────────────────── */}
       <FormSection title="Người liên hệ khẩn cấp">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Input
@@ -198,7 +241,7 @@ export function CustomerForm({
         </div>
       </FormSection>
 
-      {/* ── 4. Nguồn khách ──────────────────────────────────────────────── */}
+      {/* ── 5. Nguồn khách ──────────────────────────────────────────────── */}
       <FormSection title="Nguồn khách">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Controller
@@ -231,7 +274,7 @@ export function CustomerForm({
         </div>
       </FormSection>
 
-      {/* ── 5. Ghi chú ──────────────────────────────────────────────────── */}
+      {/* ── 6. Ghi chú ──────────────────────────────────────────────────── */}
       <FormSection title="Ghi chú">
         <div className="space-y-4">
           <Textarea

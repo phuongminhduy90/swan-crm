@@ -11,13 +11,24 @@ export const createCustomerSchema = z.object({
   secondaryPhone: z.string().trim().optional().or(z.literal('')),
   dateOfBirth: z.string().optional().or(z.literal('')),
   gender: z.enum(['female', 'male', 'other', 'unknown']).optional(),
+  // CCCD (Căn cước công dân) — Vietnamese national ID card.
+  // Accepts 9-digit CMND (legacy) or 12-digit CCCD (current).
+  // Empty string is allowed so the optional form input submits cleanly.
+  // Story B.1.1 (F-CRIT-02): CCCD fields rendered in customer form (RBAC-gated).
   nationalIdNumber: z
     .string()
     .regex(/^(\d{9}|\d{12})?$/, 'CMND phải 9 số hoặc CCCD phải 12 số')
     .optional()
     .or(z.literal('')),
-  nationalIdIssueDate: z.string().optional().or(z.literal('')),
-  nationalIdIssuePlace: z.string().optional().or(z.literal('')),
+  nationalIdIssueDate: z
+    .string()
+    .optional()
+    .or(z.literal('')),
+  nationalIdIssuePlace: z
+    .string()
+    .max(200, 'Nơi cấp tối đa 200 ký tự')
+    .optional()
+    .or(z.literal('')),
   address: z.string().optional().or(z.literal('')),
   zalo: z.string().optional().or(z.literal('')),
   facebook: z.string().optional().or(z.literal('')),
