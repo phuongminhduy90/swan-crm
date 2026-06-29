@@ -15,6 +15,7 @@ import { createCaseSchema, type CreateCaseFormValues } from '@/lib/validators/ca
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import {
   SERVICE_CATEGORY_LABELS,
   SERVICE_CATEGORY_COLORS,
@@ -730,33 +731,24 @@ export function CaseForm({ initialData, initialServices, mode = 'create', onSubm
 
       {/* Notes */}
       <div className="space-y-3">
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700">Ghi chú kinh doanh</label>
-          <textarea
-            {...register('salesNote')}
-            rows={2}
-            placeholder="Ghi chú cho team kinh doanh..."
-            className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm placeholder-gray-400 focus:border-swan-500 focus:outline-none focus:ring-2 focus:ring-swan-500/20 resize-none"
-          />
-        </div>
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700">Ghi chú y tế</label>
-          <textarea
-            {...register('medicalNote')}
-            rows={2}
-            placeholder="Ghi chú y tế (bác sĩ, điều phối...)..."
-            className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm placeholder-gray-400 focus:border-swan-500 focus:outline-none focus:ring-2 focus:ring-swan-500/20 resize-none"
-          />
-        </div>
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700">Ghi chú nội bộ</label>
-          <textarea
-            {...register('internalNote')}
-            rows={2}
-            placeholder="Ghi chú nội bộ..."
-            className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm placeholder-gray-400 focus:border-swan-500 focus:outline-none focus:ring-2 focus:ring-swan-500/20 resize-none"
-          />
-        </div>
+        <Textarea
+          label="Ghi chú kinh doanh"
+          rows={2}
+          placeholder="Ghi chú cho team kinh doanh..."
+          {...register('salesNote')}
+        />
+        <Textarea
+          label="Ghi chú y tế"
+          rows={2}
+          placeholder="Ghi chú y tế (bác sĩ, điều phối...)..."
+          {...register('medicalNote')}
+        />
+        <Textarea
+          label="Ghi chú nội bộ"
+          rows={2}
+          placeholder="Ghi chú nội bộ..."
+          {...register('internalNote')}
+        />
       </div>
     </div>
   );

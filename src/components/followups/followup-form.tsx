@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { Followup, UpdateFollowupInput, FollowupStatus, SeverityLevel } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils/cn';
 import { X } from 'lucide-react';
 
@@ -145,17 +146,12 @@ export function FollowupForm({ followup, onSubmit, onClose }: FollowupFormProps)
           ))}
         </Select>
 
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700">
-            Tình trạng khách hàng
-          </label>
-          <textarea
-            rows={3}
-            placeholder="Mô tả tình trạng hiện tại của khách hàng..."
-            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 transition-colors focus:border-swan-500 focus:outline-none focus:ring-2 focus:ring-swan-500/20"
-            {...register('customerCondition')}
-          />
-        </div>
+        <Textarea
+          label="Tình trạng khách hàng"
+          rows={3}
+          placeholder="Mô tả tình trạng hiện tại của khách hàng..."
+          {...register('customerCondition')}
+        />
 
         <div className="rounded-lg border border-gray-200 bg-white p-4 space-y-4">
           <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
@@ -166,27 +162,19 @@ export function FollowupForm({ followup, onSubmit, onClose }: FollowupFormProps)
           <SeveritySlider label="Bầm tím" value={bruisingLevel} onChange={setBruisingLevel} />
         </div>
 
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700">Ghi chú</label>
-          <textarea
-            rows={2}
-            placeholder="Ghi chú thêm..."
-            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 transition-colors focus:border-swan-500 focus:outline-none focus:ring-2 focus:ring-swan-500/20"
-            {...register('note')}
-          />
-        </div>
+        <Textarea
+          label="Ghi chú"
+          rows={2}
+          placeholder="Ghi chú thêm..."
+          {...register('note')}
+        />
 
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700">
-            Hành động tiếp theo
-          </label>
-          <textarea
-            rows={2}
-            placeholder="Kế hoạch xử lý tiếp theo..."
-            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 transition-colors focus:border-swan-500 focus:outline-none focus:ring-2 focus:ring-swan-500/20"
-            {...register('nextAction')}
-          />
-        </div>
+        <Textarea
+          label="Hành động tiếp theo"
+          rows={2}
+          placeholder="Kế hoạch xử lý tiếp theo..."
+          {...register('nextAction')}
+        />
 
         <div className="flex items-center justify-end gap-3 pt-2">
           <Button

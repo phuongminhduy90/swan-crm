@@ -7,6 +7,7 @@ import { Service } from '@/lib/types';
 import { createServiceSchema, type CreateServiceFormValues } from '@/lib/validators/service';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { ALL_SERVICE_CATEGORIES, SERVICE_CATEGORY_LABELS } from '@/constants/service-categories';
 
@@ -74,16 +75,12 @@ export function ServiceForm({ service, onSubmit, onCancel, loading = false, erro
         {...register('defaultPrice', { valueAsNumber: true })}
       />
 
-      <div>
-        <label className="mb-1.5 block text-sm font-medium text-gray-700">Mô tả</label>
-        <textarea
-          {...register('description')}
-          rows={3}
-          placeholder="Mô tả dịch vụ..."
-          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm placeholder-gray-400 focus:border-swan-500 focus:outline-none focus:ring-2 focus:ring-swan-500/20"
-        />
-        {errors.description?.message && <p className="mt-1 text-xs text-red-600">{errors.description.message}</p>}
-      </div>
+      <Textarea
+        label="Mô tả"
+        placeholder="Mô tả dịch vụ..."
+        error={errors.description?.message}
+        {...register('description')}
+      />
 
       <div className="flex items-center justify-end gap-3 border-t border-gray-100 pt-4">
         <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>Hủy</Button>

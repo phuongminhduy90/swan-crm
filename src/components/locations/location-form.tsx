@@ -12,6 +12,7 @@ import {
 } from '@/lib/validators/treatment-location';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 
 interface Props {
@@ -79,16 +80,12 @@ export function LocationForm({ location, onSubmit, onCancel, loading = false, er
         <Input label="Số điện thoại" error={errors.contactPhone?.message} {...register('contactPhone')} placeholder="0901 234 567" />
       </div>
 
-      <div>
-        <label className="mb-1.5 block text-sm font-medium text-gray-700">Ghi chú</label>
-        <textarea
-          {...register('note')}
-          rows={3}
-          placeholder="Ghi chú về địa điểm..."
-          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm placeholder-gray-400 focus:border-swan-500 focus:outline-none focus:ring-2 focus:ring-swan-500/20"
-        />
-        {errors.note?.message && <p className="mt-1 text-xs text-red-600">{errors.note.message}</p>}
-      </div>
+      <Textarea
+        label="Ghi chú"
+        placeholder="Ghi chú về địa điểm..."
+        error={errors.note?.message}
+        {...register('note')}
+      />
 
       <div className="flex items-center justify-end gap-3 border-t border-gray-100 pt-4">
         <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>Hủy</Button>

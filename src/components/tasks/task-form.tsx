@@ -7,6 +7,7 @@ import { User } from '@/lib/types';
 import { getAllUsers } from '@/lib/firestore';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import {
   createTaskSchema,
@@ -54,15 +55,11 @@ export function TaskForm({ onSubmit, onClose }: Props) {
       />
 
       {/* Description */}
-      <div className="w-full">
-        <label className="mb-1.5 block text-sm font-medium text-gray-700">Mô tả</label>
-        <textarea
-          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 transition-colors focus:border-swan-500 focus:outline-none focus:ring-2 focus:ring-swan-500/20"
-          rows={3}
-          placeholder="Mô tả chi tiết công việc..."
-          {...register('description')}
-        />
-      </div>
+      <Textarea
+        label="Mô tả"
+        placeholder="Mô tả chi tiết công việc..."
+        {...register('description')}
+      />
 
       {/* Case ID (optional) */}
       <Input

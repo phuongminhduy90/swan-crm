@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
 import { useToast } from '@/components/ui/toast';
 import { formatDateVN } from '@/lib/utils/format';
@@ -482,16 +483,13 @@ export default function CalendarPage() {
             />
           </div>
 
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">Ghi chú</label>
-            <textarea
-              rows={3}
-              placeholder="Ghi chú về lịch hẹn..."
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm placeholder-gray-400 focus:border-swan-500 focus:outline-none focus:ring-2 focus:ring-swan-500/20"
-              value={createForm.note}
-              onChange={(e) => setCreateForm((f) => ({ ...f, note: e.target.value }))}
-            />
-          </div>
+          <Textarea
+            label="Ghi chú"
+            rows={3}
+            placeholder="Ghi chú về lịch hẹn..."
+            value={createForm.note}
+            onChange={(e) => setCreateForm((f) => ({ ...f, note: e.target.value }))}
+          />
 
           <div className="flex items-center justify-end gap-3 border-t border-gray-100 pt-4">
             <Button
