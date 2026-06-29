@@ -70,7 +70,10 @@ export const CASE_STATUS_TRANSITIONS: Partial<Record<CaseStatus, CaseStatus[]>> 
   payment_confirmed: ['waiting_location_assignment'],
   waiting_location_assignment: ['waiting_hospital_confirmation', 'waiting_doctor_review'],
   waiting_hospital_confirmation: ['hospital_confirmed', 'postponed'],
-  hospital_confirmed: ['waiting_doctor_review', 'waiting_lab_test', 'scheduled'],
+  // B.1.2 (F-CRIT-04): clinical-safety gate — case must pass doctor review (and
+  // lab when applicable) before scheduling. `scheduled` is reachable only via
+  // `medically_approved`. See docs/ux-redesign/STORY_B1_2_MIGRATION_NOTES.md.
+  hospital_confirmed: ['waiting_doctor_review', 'waiting_lab_test'],
   waiting_doctor_review: ['medically_approved', 'medical_alert', 'postponed'],
   waiting_lab_test: ['lab_test_done'],
   lab_test_done: ['medically_approved', 'medical_alert'],

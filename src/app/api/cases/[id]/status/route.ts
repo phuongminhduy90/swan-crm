@@ -5,6 +5,7 @@ import { updateCaseStatusSchema } from '@/lib/validators/case';
 import {
   CASE_STATUS_TRANSITIONS,
 } from '@/constants/case-status';
+import { CASE_STATUS_CHANGE_ROLES } from '@/constants/permissions';
 import { CaseStatus } from '@/lib/types';
 import { writeAuditLog } from '@/lib/firestore/audit';
 import {
@@ -16,15 +17,47 @@ import { getCustomer } from '@/lib/firestore/customers';
 import { requirePermission, isErrorResponse } from '@/lib/api/auth';
 import { triggerAutoTasks } from '@/lib/tasks/auto-tasks';
 import { createPostOpFollowups } from '@/lib/firestore/followups';
+import { isFlagEnabled } from '@/lib/feature-flags';
 
+/**
+ * PATCH /api/cases/[id]/status
+ *
+ * Story B.1.3 (F-CRIT-05) — Server-side role enforcement for case status.
+ *
+ * When `FEATURE_SERVER_RBAC` is enabled:
+ *   1. The caller must have the `cases:write` permission (existing check).
+ *   2. The caller's role must be in `CASE_STATUS_CHANGE_ROLES` (new guard).
+ *   3. The requested transition must be in `CASE_STATUS_TRANSITIONS` (existing check).
+ *
+ * Decision (Appendix A, Q1, locked):
+ *   Only roles in CASE_STATUS_CHANGE_ROLES may change ANY case status. Sales
+ *   roles (`sales_online`, `sales_offline`) lose status-change rights entirely.
+ *   Coordinators + clinical roles retain them.
+ *
+ * The flag defaults to OFF in production. When OFF, only the `cases:write`
+ * permission gate applies (pre-existing behavior).
+ */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } },
 ) {
   try {
+    // --- Auth & permission gate (existing) ---
     const authResult = await requirePermission(request, 'cases:write');
     if (isErrorResponse(authResult)) return authResult;
     const user = authResult.user;
+
+    // --- B.1.3: Server-side RBAC guard (behind flag) ---
+    if (isFlagEnabled('SERVER_RBAC')) {
+      if (!CASE_STATUS_CHANGE_ROLES.includes(user.role)) {
+        return NextResponse.json(
+          {
+            error: `Bạn không có quyền thay đổi trạng thái hồ sơ. Vai trò "${user.role}" không nằm trong danh sách "${CASE_STATUS_CHANGE_ROLES.join('", "')}".`,
+          },
+          { status: 403 },
+        );
+      }
+    }
 
     const body = await request.json();
     const data = updateCaseStatusSchema.parse(body);
