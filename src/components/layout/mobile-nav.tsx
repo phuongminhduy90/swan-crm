@@ -6,58 +6,9 @@ import Link from 'next/link';
 import { X, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
-import { hasPermission } from '@/lib/auth/rb';
+import { useVisibleMenu } from '@/lib/hooks/useVisibleMenu';
 import { SwanLogo } from '@/components/ui/swan-logo';
-import {
-  LayoutDashboard,
-  Users,
-  FolderOpen,
-  CreditCard,
-  Calendar,
-  CheckSquare,
-  Bell,
-  ImageIcon,
-  BarChart3,
-  Settings,
-  BellRing,
-  FileText,
-  UserCog,
-  Shield,
-  MapPin,
-  Stethoscope,
-  type LucideIcon,
-} from 'lucide-react';
-
-interface MenuItem {
-  label: string;
-  href: string;
-  icon: LucideIcon;
-  permission: string;
-}
-
-const MENU_ITEMS: MenuItem[] = [
-  { label: 'Bảng điều khiển', href: '/dashboard', icon: LayoutDashboard, permission: 'dashboard:read' },
-  { label: 'Khách hàng', href: '/customers', icon: Users, permission: 'customers:read' },
-  { label: 'Hồ sơ CASE', href: '/cases', icon: FolderOpen, permission: 'cases:read' },
-  { label: 'Thanh toán', href: '/payments', icon: CreditCard, permission: 'payments:read' },
-  { label: 'Lịch hẹn', href: '/calendar', icon: Calendar, permission: 'calendar:read' },
-  { label: 'Công việc', href: '/tasks', icon: CheckSquare, permission: 'tasks:read' },
-  { label: 'Theo dõi sau', href: '/followups', icon: Bell, permission: 'followups:read' },
-  { label: 'Thư viện Media', href: '/media-library', icon: ImageIcon, permission: 'media:read' },
-  { label: 'Báo cáo', href: '/reports', icon: BarChart3, permission: 'reports:read' },
-];
-
-const SETTINGS_SUB_ITEMS: MenuItem[] = [
-  { label: 'Người dùng', href: '/settings/users', icon: UserCog, permission: 'users:read' },
-  { label: 'Phân quyền', href: '/settings/roles', icon: Shield, permission: 'roles:read' },
-  { label: 'Điểm điều trị', href: '/settings/treatment-locations', icon: MapPin, permission: 'settings:read' },
-  { label: 'Dịch vụ', href: '/settings/services', icon: Stethoscope, permission: 'settings:read' },
-];
-
-const BOTTOM_ITEMS: MenuItem[] = [
-  { label: 'Thông báo', href: '/notifications', icon: BellRing, permission: 'notifications:read' },
-  { label: 'Nhật ký', href: '/audit-logs', icon: FileText, permission: 'audit:read' },
-];
+import type { MenuItem } from '@/config/sidebar-menu';
 
 interface MobileNavProps {
   open: boolean;
@@ -67,6 +18,7 @@ interface MobileNavProps {
 export function MobileNav({ open, onClose }: MobileNavProps) {
   const pathname = usePathname();
   const { user } = useCurrentUser();
+  const { mainItems, settingsItems, bottomItems, canSeeSettings } = useVisibleMenu();
 
   useEffect(() => {
     if (open) {
@@ -80,13 +32,6 @@ export function MobileNav({ open, onClose }: MobileNavProps) {
   }, [open]);
 
   if (!user) return null;
-  const role = user.role;
-
-  const visible = MENU_ITEMS.filter((m) => hasPermission(role, m.permission as never));
-  const visibleSettings = SETTINGS_SUB_ITEMS.filter((m) =>
-    hasPermission(role, m.permission as never),
-  );
-  const visibleBottom = BOTTOM_ITEMS.filter((m) => hasPermission(role, m.permission as never));
 
   return (
     <>
@@ -118,7 +63,7 @@ export function MobileNav({ open, onClose }: MobileNavProps) {
         </div>
 
         <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2">
-          {visible.map((item) => (
+          {mainItems.map((item) => (
             <MobileLink
               key={item.href}
               item={item}
@@ -126,13 +71,13 @@ export function MobileNav({ open, onClose }: MobileNavProps) {
               onClick={onClose}
             />
           ))}
-          {visibleSettings.length > 0 && (
+          {canSeeSettings && settingsItems.length > 0 && (
             <div className="pt-4">
               <p className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
                 Cài đặt
               </p>
               <div className="space-y-1">
-                {visibleSettings.map((item) => (
+                {settingsItems.map((item) => (
                   <MobileLink
                     key={item.href}
                     item={item}
@@ -146,7 +91,7 @@ export function MobileNav({ open, onClose }: MobileNavProps) {
         </nav>
 
         <div className="border-t border-gray-100 px-3 py-2">
-          {visibleBottom.map((item) => (
+          {bottomItems.map((item) => (
             <MobileLink
               key={item.href}
               item={item}
