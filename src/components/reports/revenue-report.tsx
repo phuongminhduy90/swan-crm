@@ -1,0 +1,95 @@
+'use client';
+
+import { useMemo } from 'react';
+import { TrendingUp } from 'lucide-react';
+import { Payment, CaseRecord } from '@/lib/types';
+import { StatSummary } from './stat-summary';
+import { RevenueTrendChart, MonthlyRevenuePoint } from './revenue-trend-chart';
+import { PaymentMethodChart, PaymentMethodDatum } from './payment-method-chart';
+import { ChartCard } from './chart-card';
+import { DateRangeOption } from './report-filters';
+import { getMonthKey, getMonthLabel } from '@/lib/utils/format';
+
+interface RevenueReportProps {
+  payments: Payment[];
+  cases: CaseRecord[];
+  dateRange: DateRangeOption;
+}
+
+export function RevenueReport({ payments, cases, dateRange }: RevenueReportProps) {
+  // Filter payments by date range
+  const filteredPayments = useMemo(() => {
+    if (dateRange === 0) return payments;
+    const cutoff = new Date();
+    cutoff.setMonth(cutoff.getMonth() - dateRange);
+    return payments.filter((p) => new Date(p.paymentDate) >= cutoff);
+  }, [payments, dateRange]);
+
+  // Stats
+  const stats = useMemo(() => {
+    const confirmed = filteredPayments
+      .filter((p) => p.status === 'confirmed')
+      .reduce((sum, p) => sum + (p.amount ?? 0), 0);
+    const pending = filteredPayments
+      .filter((p) => p.status === 'pending')
+      .reduce((sum, p) => sum + (p.amount ?? 0), 0);
+    const refund = filteredPayments
+      .filter((p) => p.paymentType === 'refund')
+      .reduce((sum, p) => sum + (p.amount ?? 0), 0);
+    const total = confirmed + pending;
+    const uniqueCaseIds = new Set(filteredPayments.map((p) => p.caseId));
+    const avgPerCase = uniqueCaseIds.size > 0 ? confirmed / uniqueCaseIds.size : 0;
+    return { total, confirmed, pending, refund, avgPerCase };
+  }, [filteredPayments]);
+
+  // Monthly trend
+  const monthlyData: MonthlyRevenuePoint[] = useMemo(() => {
+    const map = new Map<string, { confirmed: number; pending: number }>();
+    for (const p of filteredPayments) {
+      const key = getMonthKey(new Date(p.paymentDate));
+      if (!map.has(key)) map.set(key, { confirmed: 0, pending: 0 });
+      const entry = map.get(key)!;
+      if (p.status === 'confirmed') entry.confirmed += p.amount ?? 0;
+      else entry.pending += p.amount ?? 0;
+    }
+    const sorted = Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+    return sorted.map(([key, val]) => ({
+      monthKey: key,
+      label: getMonthLabel(new Date(key + '-01')),
+      confirmed: val.confirmed,
+      pending: val.pending,
+    }));
+  }, [filteredPayments]);
+
+  // Payment method breakdown
+  const methodData: PaymentMethodDatum[] = useMemo(() => {
+    const map = new Map<string, { total: number; count: number }>();
+    for (const p of filteredPayments) {
+      if (!map.has(p.paymentMethod)) map.set(p.paymentMethod, { total: 0, count: 0 });
+      const entry = map.get(p.paymentMethod)!;
+      entry.total += p.amount ?? 0;
+      entry.count += 1;
+    }
+    return Array.from(map.entries()).map(([method, val]) => ({
+      method: method as PaymentMethodDatum['method'],
+      total: val.total,
+      count: val.count,
+    }));
+  }, [filteredPayments]);
+
+  return (
+    <div className="space-y-6">
+      <StatSummary stats={stats} caseCount={new Set(filteredPayments.map((p) => p.caseId)).size} />
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <ChartCard title="Doanh thu theo tháng" icon={<TrendingUp className="h-5 w-5 text-swan-600" />} className="lg:col-span-2" minHeight={320}>
+          <RevenueTrendChart data={monthlyData} />
+        </ChartCard>
+
+        <ChartCard title="Phương thức thanh toán" icon={<TrendingUp className="h-5 w-5 text-champagne-500" />} minHeight={320}>
+          <PaymentMethodChart data={methodData} />
+        </ChartCard>
+      </div>
+    </div>
+  );
+}

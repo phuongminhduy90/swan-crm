@@ -580,14 +580,39 @@ function seedPayments(): void {
   const col = getCollection('payments');
   const now = new Date();
   const day = (offset: number) => { const d = new Date(now); d.setDate(d.getDate() - offset); return d.toISOString(); };
+  const month = (offset: number) => { const d = new Date(now); d.setMonth(d.getMonth() - offset); d.setDate(Math.min(d.getDate(), 15)); return d.toISOString(); };
 
   const payments = [
+    // ── Cases 1-5 (original) ─────────────────────────────
     { id: 'pay-001', caseId: 'case-001', customerId: 'cus-001', amount: 10000000, paymentMethod: 'cash', paymentType: 'deposit', receivedBy: 'user-004', paymentDate: day(14), status: 'confirmed', confirmedBy: 'user-007', confirmedAt: day(13), createdBy: 'user-004', createdAt: day(14), updatedAt: day(13) },
     { id: 'pay-002', caseId: 'case-001', customerId: 'cus-001', amount: 30000000, paymentMethod: 'bank_transfer', paymentType: 'partial', paymentDate: day(1), status: 'pending', createdBy: 'user-004', createdAt: day(1), updatedAt: day(1) },
     { id: 'pay-003', caseId: 'case-002', customerId: 'cus-002', amount: 40000000, paymentMethod: 'bank_transfer', paymentType: 'full', receivedBy: 'user-004', paymentDate: day(9), status: 'confirmed', confirmedBy: 'user-007', confirmedAt: day(8), createdBy: 'user-004', createdAt: day(9), updatedAt: day(8) },
     { id: 'pay-004', caseId: 'case-003', customerId: 'cus-003', amount: 20000000, paymentMethod: 'bank_transfer', paymentType: 'partial', receivedBy: 'user-006', paymentDate: day(6), status: 'confirmed', confirmedBy: 'user-007', confirmedAt: day(5), createdBy: 'user-006', createdAt: day(6), updatedAt: day(5) },
     { id: 'pay-005', caseId: 'case-004', customerId: 'cus-004', amount: 75000000, paymentMethod: 'bank_transfer', paymentType: 'full', receivedBy: 'user-004', paymentDate: day(20), status: 'confirmed', confirmedBy: 'user-007', confirmedAt: day(19), createdBy: 'user-004', createdAt: day(20), updatedAt: day(19) },
     { id: 'pay-006', caseId: 'case-005', customerId: 'cus-005', amount: 35000000, paymentMethod: 'bank_transfer', paymentType: 'full', receivedBy: 'user-005', paymentDate: day(17), status: 'confirmed', confirmedBy: 'user-007', confirmedAt: day(16), createdBy: 'user-005', createdAt: day(17), updatedAt: day(16) },
+
+    // ── Cases 6-10 (Jan–Mar 2026) ────────────────────────
+    { id: 'pay-007', caseId: 'case-006', customerId: 'cus-006', amount: 65000000, paymentMethod: 'bank_transfer', paymentType: 'full', receivedBy: 'user-004', paymentDate: month(5), status: 'confirmed', confirmedBy: 'user-007', confirmedAt: month(5), createdBy: 'user-004', createdAt: month(5), updatedAt: month(5) },
+    { id: 'pay-008', caseId: 'case-008', customerId: 'cus-008', amount: 65000000, paymentMethod: 'card', paymentType: 'full', receivedBy: 'user-004', paymentDate: month(3), status: 'confirmed', confirmedBy: 'user-007', confirmedAt: month(3), createdBy: 'user-004', createdAt: month(3), updatedAt: month(3) },
+    { id: 'pay-009', caseId: 'case-009', customerId: 'cus-009', amount: 5000000, paymentMethod: 'cash', paymentType: 'deposit', receivedBy: 'user-006', paymentDate: day(6), status: 'confirmed', confirmedBy: 'user-007', confirmedAt: day(5), createdBy: 'user-006', createdAt: day(6), updatedAt: day(5) },
+    { id: 'pay-010', caseId: 'case-010', customerId: 'cus-010', amount: 18000000, paymentMethod: 'bank_transfer', paymentType: 'full', receivedBy: 'user-005', paymentDate: month(1), status: 'confirmed', confirmedBy: 'user-007', confirmedAt: month(1), createdBy: 'user-005', createdAt: month(1), updatedAt: month(1) },
+    { id: 'pay-011', caseId: 'case-011', customerId: 'cus-011', amount: 37000000, paymentMethod: 'installment', paymentType: 'full', receivedBy: 'user-004', paymentDate: month(4), status: 'confirmed', confirmedBy: 'user-007', confirmedAt: month(4), createdBy: 'user-004', createdAt: month(4), updatedAt: month(4) },
+    { id: 'pay-012', caseId: 'case-012', customerId: 'cus-012', amount: 5000000, paymentMethod: 'cash', paymentType: 'deposit', receivedBy: 'user-005', paymentDate: month(2), status: 'confirmed', confirmedBy: 'user-007', confirmedAt: month(2), createdBy: 'user-005', createdAt: month(2), updatedAt: month(2) },
+
+    // ── Cases 11-15 (Apr–Jun 2026) ───────────────────────
+    { id: 'pay-013', caseId: 'case-013', customerId: 'cus-013', amount: 72000000, paymentMethod: 'bank_transfer', paymentType: 'full', receivedBy: 'user-004', paymentDate: month(1), status: 'confirmed', confirmedBy: 'user-007', confirmedAt: day(28), createdBy: 'user-004', createdAt: month(1), updatedAt: day(28) },
+    { id: 'pay-014', caseId: 'case-015', customerId: 'cus-015', amount: 20000000, paymentMethod: 'installment', paymentType: 'partial', receivedBy: 'user-006', paymentDate: month(1), status: 'confirmed', confirmedBy: 'user-007', confirmedAt: month(1), createdBy: 'user-006', createdAt: month(1), updatedAt: month(1) },
+    { id: 'pay-015', caseId: 'case-016', customerId: 'cus-016', amount: 13000000, paymentMethod: 'card', paymentType: 'full', receivedBy: 'user-005', paymentDate: day(10), status: 'confirmed', confirmedBy: 'user-007', confirmedAt: day(9), createdBy: 'user-005', createdAt: day(10), updatedAt: day(9) },
+    { id: 'pay-016', caseId: 'case-017', customerId: 'cus-017', amount: 65000000, paymentMethod: 'bank_transfer', paymentType: 'full', receivedBy: 'user-004', paymentDate: month(0), status: 'confirmed', confirmedBy: 'user-007', confirmedAt: day(18), createdBy: 'user-004', createdAt: month(0), updatedAt: day(18) },
+    { id: 'pay-017', caseId: 'case-018', customerId: 'cus-018', amount: 10000000, paymentMethod: 'cash', paymentType: 'deposit', receivedBy: 'user-006', paymentDate: day(15), status: 'confirmed', confirmedBy: 'user-007', confirmedAt: day(14), createdBy: 'user-006', createdAt: day(15), updatedAt: day(14) },
+    { id: 'pay-018', caseId: 'case-019', customerId: 'cus-019', amount: 20000000, paymentMethod: 'bank_transfer', paymentType: 'full', receivedBy: 'user-006', paymentDate: month(3), status: 'confirmed', confirmedBy: 'user-007', confirmedAt: month(3), createdBy: 'user-006', createdAt: month(3), updatedAt: month(3) },
+    { id: 'pay-019', caseId: 'case-014', customerId: 'cus-014', amount: 0, paymentMethod: 'other', paymentType: 'full', paymentDate: month(1), status: 'confirmed', confirmedBy: 'user-007', confirmedAt: month(1), note: 'Dịch vụ đổi(content) — giá trị 0 VNĐ', createdBy: 'user-005', createdAt: month(1), updatedAt: month(1) },
+
+    // ── Additional payments for spread (installment, refunds) ──────
+    { id: 'pay-020', caseId: 'case-011', customerId: 'cus-011', amount: 10000000, paymentMethod: 'installment', paymentType: 'refund', receivedBy: 'user-007', paymentDate: month(3), status: 'confirmed', confirmedBy: 'user-007', confirmedAt: month(3), note: 'Hoàn trả phần chênh lệch', createdBy: 'user-007', createdAt: month(3), updatedAt: month(3) },
+    { id: 'pay-021', caseId: 'case-015', customerId: 'cus-015', amount: 22750000, paymentMethod: 'installment', paymentType: 'partial', paymentDate: day(8), status: 'pending', createdBy: 'user-006', createdAt: day(8), updatedAt: day(8) },
+    { id: 'pay-022', caseId: 'case-001', customerId: 'cus-001', amount: 5000000, paymentMethod: 'other', paymentType: 'deposit', paymentDate: day(30), status: 'pending', createdBy: 'user-004', createdAt: day(30), updatedAt: day(30) },
+    { id: 'pay-023', caseId: 'case-009', customerId: 'cus-009', amount: 15000000, paymentMethod: 'bank_transfer', paymentType: 'partial', paymentDate: day(3), status: 'pending', createdBy: 'user-006', createdAt: day(3), updatedAt: day(3) },
   ];
   for (const p of payments) col.set(p.id, p as Record<string, unknown>);
 }
@@ -668,6 +693,33 @@ function seedFollowups(): void {
     { id: 'fup-case005-D14', caseId: 'case-005', customerId: 'cus-005', followupDay: 'D14', dueDate: future(4), assignedTo: 'user-011', status: 'pending', requestedImage: false, imageUploaded: false, createdAt: day(10), updatedAt: day(10) },
     { id: 'fup-case005-D30', caseId: 'case-005', customerId: 'cus-005', followupDay: 'D30', dueDate: future(20), assignedTo: 'user-011', status: 'pending', requestedImage: false, imageUploaded: false, createdAt: day(10), updatedAt: day(10) },
     { id: 'fup-case005-D90', caseId: 'case-005', customerId: 'cus-005', followupDay: 'D90', dueDate: future(80), assignedTo: 'user-011', status: 'pending', requestedImage: false, imageUploaded: false, createdAt: day(10), updatedAt: day(10) },
+
+    // ── Case 11 (post_op_d30 — procedure 35 days ago) ──────
+    { id: 'fup-case011-D1', caseId: 'case-011', customerId: 'cus-011', followupDay: 'D1', dueDate: day(34), assignedTo: 'user-011', status: 'completed', customerCondition: 'Sưng nhẹ vùng mũi', painLevel: 2, swellingLevel: 2, bruisingLevel: 1, requestedImage: true, imageUploaded: true, createdAt: day(35), updatedAt: day(34) },
+    { id: 'fup-case011-D3', caseId: 'case-011', customerId: 'cus-011', followupDay: 'D3', dueDate: day(32), assignedTo: 'user-011', status: 'completed', painLevel: 1, swellingLevel: 1, bruisingLevel: 0, requestedImage: true, imageUploaded: true, createdAt: day(35), updatedAt: day(32) },
+    { id: 'fup-case011-D7', caseId: 'case-011', customerId: 'cus-011', followupDay: 'D7', dueDate: day(28), assignedTo: 'user-011', status: 'completed', painLevel: 1, swellingLevel: 1, bruisingLevel: 0, requestedImage: true, imageUploaded: true, createdAt: day(35), updatedAt: day(28) },
+    { id: 'fup-case011-D14', caseId: 'case-011', customerId: 'cus-011', followupDay: 'D14', dueDate: day(21), assignedTo: 'user-011', status: 'completed', painLevel: 0, swellingLevel: 0, bruisingLevel: 0, requestedImage: true, imageUploaded: true, createdAt: day(35), updatedAt: day(21) },
+    { id: 'fup-case011-D30', caseId: 'case-011', customerId: 'cus-011', followupDay: 'D30', dueDate: day(5), assignedTo: 'user-011', status: 'contacted', customerCondition: 'Vết mổ lành hoàn toàn', painLevel: 0, swellingLevel: 0, bruisingLevel: 0, requestedImage: true, imageUploaded: true, createdAt: day(35), updatedAt: day(5) },
+    { id: 'fup-case011-D90', caseId: 'case-011', customerId: 'cus-011', followupDay: 'D90', dueDate: future(55), assignedTo: 'user-011', status: 'pending', requestedImage: false, imageUploaded: false, createdAt: day(35), updatedAt: day(35) },
+
+    // ── Case 17 (post_op_d7 — procedure 7 days ago) ───────
+    { id: 'fup-case017-D1', caseId: 'case-017', customerId: 'cus-017', followupDay: 'D1', dueDate: day(6), assignedTo: 'user-011', status: 'completed', painLevel: 3, swellingLevel: 3, bruisingLevel: 2, requestedImage: true, imageUploaded: true, createdAt: day(7), updatedAt: day(6) },
+    { id: 'fup-case017-D3', caseId: 'case-017', customerId: 'cus-017', followupDay: 'D3', dueDate: day(4), assignedTo: 'user-011', status: 'completed', painLevel: 2, swellingLevel: 2, bruisingLevel: 1, requestedImage: true, imageUploaded: true, createdAt: day(7), updatedAt: day(4) },
+    { id: 'fup-case017-D7', caseId: 'case-017', customerId: 'cus-017', followupDay: 'D7', dueDate: future(0), assignedTo: 'user-011', status: 'pending', requestedImage: false, imageUploaded: false, createdAt: day(7), updatedAt: day(7) },
+    { id: 'fup-case017-D14', caseId: 'case-017', customerId: 'cus-017', followupDay: 'D14', dueDate: future(7), assignedTo: 'user-011', status: 'pending', requestedImage: false, imageUploaded: false, createdAt: day(7), updatedAt: day(7) },
+
+    // ── Case 6 (completed — full followup trail from past) ─────
+    { id: 'fup-case006-D1', caseId: 'case-006', customerId: 'cus-006', followupDay: 'D1', dueDate: day(39), assignedTo: 'user-011', status: 'completed', painLevel: 3, swellingLevel: 3, bruisingLevel: 2, requestedImage: true, imageUploaded: true, createdAt: day(40), updatedAt: day(39) },
+    { id: 'fup-case006-D3', caseId: 'case-006', customerId: 'cus-006', followupDay: 'D3', dueDate: day(37), assignedTo: 'user-011', status: 'completed', painLevel: 2, swellingLevel: 2, bruisingLevel: 1, requestedImage: true, imageUploaded: true, createdAt: day(40), updatedAt: day(37) },
+    { id: 'fup-case006-D7', caseId: 'case-006', customerId: 'cus-006', followupDay: 'D7', dueDate: day(33), assignedTo: 'user-011', status: 'completed', painLevel: 1, swellingLevel: 1, bruisingLevel: 0, requestedImage: true, imageUploaded: true, createdAt: day(40), updatedAt: day(33) },
+    { id: 'fup-case006-D14', caseId: 'case-006', customerId: 'cus-006', followupDay: 'D14', dueDate: day(26), assignedTo: 'user-011', status: 'completed', painLevel: 0, swellingLevel: 0, bruisingLevel: 0, requestedImage: true, imageUploaded: true, createdAt: day(40), updatedAt: day(26) },
+    { id: 'fup-case006-D30', caseId: 'case-006', customerId: 'cus-006', followupDay: 'D30', dueDate: day(10), assignedTo: 'user-011', status: 'completed', painLevel: 0, swellingLevel: 0, bruisingLevel: 0, requestedImage: true, imageUploaded: true, createdAt: day(40), updatedAt: day(10) },
+    { id: 'fup-case006-D90', caseId: 'case-006', customerId: 'cus-006', followupDay: 'D90', dueDate: future(50), assignedTo: 'user-011', status: 'no_response', note: 'Khách không nghe máy 3 lần', requestedImage: true, imageUploaded: false, createdAt: day(40), updatedAt: day(5) },
+
+    // ── Case 19 (complaint — issue_reported) ──────────────
+    { id: 'fup-case019-D1', caseId: 'case-019', customerId: 'cus-019', followupDay: 'D1', dueDate: day(44), assignedTo: 'user-011', status: 'completed', painLevel: 3, swellingLevel: 3, bruisingLevel: 2, requestedImage: true, imageUploaded: true, createdAt: day(45), updatedAt: day(44) },
+    { id: 'fup-case019-D3', caseId: 'case-019', customerId: 'cus-019', followupDay: 'D3', dueDate: day(42), assignedTo: 'user-011', status: 'issue_reported', customerCondition: 'Khách báo sưng không giảm, nghi tụ dịch', painLevel: 4, swellingLevel: 4, bruisingLevel: 2, requestedImage: true, imageUploaded: true, note: 'Đã liên hệ BS Ngọc Anh — đề nghị tái khám gấp', createdAt: day(45), updatedAt: day(42) },
+    { id: 'fup-case019-D7', caseId: 'case-019', customerId: 'cus-019', followupDay: 'D7', dueDate: day(38), assignedTo: 'user-011', status: 'issue_reported', painLevel: 3, swellingLevel: 3, bruisingLevel: 1, requestedImage: true, imageUploaded: true, createdAt: day(45), updatedAt: day(38) },
   ];
   for (const f of followups) col.set(f.id, f as Record<string, unknown>);
 }
@@ -734,22 +786,46 @@ function seedAuditLogs(): void {
   const col = getCollection('auditLogs');
   const now = new Date();
   const day = (offset: number) => { const d = new Date(now); d.setDate(d.getDate() - offset); return d.toISOString(); };
+  const month = (offset: number) => { const d = new Date(now); d.setMonth(d.getMonth() - offset); d.setDate(Math.min(d.getDate(), 15)); return d.toISOString(); };
 
   const logs = [
-    { id: 'audit-001', actorId: 'user-004', actorName: 'Trần Minh Sang', actorRole: 'master_sales', action: 'customer_created', entityType: 'customer', entityId: 'cus-001', after: { fullName: 'Nguyễn Thị Bích Ngọc', phone: '0912 345 601' }, createdAt: day(15) },
-    { id: 'audit-002', actorId: 'user-004', actorName: 'Trần Minh Sang', actorRole: 'master_sales', action: 'case_created', entityType: 'case', entityId: 'case-001', after: { caseCode: 'SW-260620-001', status: 'draft', customerId: 'cus-001' }, createdAt: day(14) },
-    { id: 'audit-003', actorId: 'user-004', actorName: 'Trần Minh Sang', actorRole: 'master_sales', action: 'attachment_uploaded', entityType: 'attachment', entityId: 'att-case001-id-front', after: { type: 'national_id_front', fileName: 'cccd-mat-truoc-ngoc.jpg' }, createdAt: day(14) },
-    { id: 'audit-004', actorId: 'user-004', actorName: 'Trần Minh Sang', actorRole: 'master_sales', action: 'customer_updated', entityType: 'customer', entityId: 'cus-002', before: { fullName: 'Trần Thị Hương', privacyLevel: 'normal' }, after: { fullName: 'Trần Thị Hương', privacyLevel: 'vip' }, createdAt: day(10) },
-    { id: 'audit-005', actorId: 'user-004', actorName: 'Trần Minh Sang', actorRole: 'master_sales', action: 'case_status_changed', entityType: 'case', entityId: 'case-001', before: { status: 'draft' }, after: { status: 'waiting_payment_confirmation' }, createdAt: day(14) },
-    { id: 'audit-006', actorId: 'user-007', actorName: 'Hồ Thị Lan', actorRole: 'accountant', action: 'payment_confirmed', entityType: 'payment', entityId: 'pay-001', before: { status: 'pending' }, after: { status: 'confirmed' }, createdAt: day(13) },
-    { id: 'audit-007', actorId: 'user-004', actorName: 'Trần Minh Sang', actorRole: 'master_sales', action: 'payment_created', entityType: 'payment', entityId: 'pay-002', after: { amount: 30000000, caseId: 'case-001' }, createdAt: day(1) },
-    { id: 'audit-008', actorId: 'user-004', actorName: 'Trần Minh Sang', actorRole: 'master_sales', action: 'staff_assignment_changed', entityType: 'case', entityId: 'case-001', before: {}, after: { masterSalesId: 'user-004', coordinatorId: 'user-010', accountantId: 'user-007' }, createdAt: day(14) },
-    { id: 'audit-009', actorId: 'user-010', actorName: 'Trương Văn Khoa', actorRole: 'coordinator', action: 'case_status_changed', entityType: 'case', entityId: 'case-002', before: { status: 'waiting_hospital_coordination' }, after: { status: 'payment_confirmed' }, createdAt: day(7) },
-    { id: 'audit-010', actorId: 'user-012', actorName: 'Lý Minh Tú', actorRole: 'media', action: 'attachment_uploaded', entityType: 'attachment', entityId: 'att-case004-before', after: { type: 'before_image', fileName: 'before-mentor-boost-ha.jpg' }, createdAt: day(20) },
-    { id: 'audit-011', actorId: 'user-012', actorName: 'Lý Minh Tú', actorRole: 'media', action: 'attachment_visibility_changed', entityType: 'attachment', entityId: 'att-case004-after', before: { visibility: 'private' }, after: { visibility: 'media_approved' }, createdAt: day(5) },
-    { id: 'audit-012', actorId: 'user-004', actorName: 'Trần Minh Sang', actorRole: 'master_sales', action: 'consent_updated', entityType: 'consent', entityId: 'con-cus001-treatment', before: { consentStatus: 'pending' }, after: { consentStatus: 'granted', signedBy: 'cus-001' }, createdAt: day(14) },
-    { id: 'audit-013', actorId: 'user-007', actorName: 'Hồ Thị Lan', actorRole: 'accountant', action: 'payment_confirmed', entityType: 'payment', entityId: 'pay-003', before: { status: 'pending' }, after: { status: 'confirmed' }, createdAt: day(8) },
-    { id: 'audit-014', actorId: 'user-011', actorName: 'Phạm Ngọc Điệp', actorRole: 'cskh_postop', action: 'task_completed', entityType: 'task', entityId: 'task-007', before: { status: 'todo' }, after: { status: 'done', completedAt: day(3) }, createdAt: day(3) },
+    // ── Jan–Feb 2026 ──────────────────────────────────────
+    { id: 'audit-001', actorId: 'user-004', actorName: 'Trần Minh Sang', actorRole: 'master_sales', action: 'customer_created', entityType: 'customer', entityId: 'cus-001', after: { fullName: 'Nguyễn Thị Bích Ngọc', phone: '0912 345 601' }, createdAt: month(5) },
+    { id: 'audit-002', actorId: 'user-004', actorName: 'Trần Minh Sang', actorRole: 'master_sales', action: 'case_created', entityType: 'case', entityId: 'case-001', after: { caseCode: 'SW-260620-001', status: 'draft', customerId: 'cus-001' }, createdAt: month(5) },
+    { id: 'audit-003', actorId: 'user-004', actorName: 'Trần Minh Sang', actorRole: 'master_sales', action: 'attachment_uploaded', entityType: 'attachment', entityId: 'att-case001-id-front', after: { type: 'national_id_front', fileName: 'cccd-mat-truoc-ngoc.jpg' }, createdAt: month(5) },
+    { id: 'audit-004', actorId: 'user-004', actorName: 'Trần Minh Sang', actorRole: 'master_sales', action: 'customer_created', entityType: 'customer', entityId: 'cus-006', after: { fullName: 'Hoàng Thị Lan Phương' }, createdAt: month(5) },
+    { id: 'audit-005', actorId: 'user-006', actorName: 'Phạm Văn Hùng', actorRole: 'sales_offline', action: 'customer_created', entityType: 'customer', entityId: 'cus-003', after: { fullName: 'Lê Thị Mỹ Linh' }, createdAt: month(5) },
+    { id: 'audit-006', actorId: 'user-007', actorName: 'Hồ Thị Lan', actorRole: 'accountant', action: 'payment_confirmed', entityType: 'payment', entityId: 'pay-007', before: { status: 'pending' }, after: { status: 'confirmed' }, createdAt: month(5) },
+
+    // ── Mar–Apr 2026 ──────────────────────────────────────
+    { id: 'audit-007', actorId: 'user-004', actorName: 'Trần Minh Sang', actorRole: 'master_sales', action: 'customer_updated', entityType: 'customer', entityId: 'cus-002', before: { privacyLevel: 'normal' }, after: { privacyLevel: 'vip' }, createdAt: month(4) },
+    { id: 'audit-008', actorId: 'user-004', actorName: 'Trần Minh Sang', actorRole: 'master_sales', action: 'case_status_changed', entityType: 'case', entityId: 'case-006', before: { status: 'procedure_completed' }, after: { status: 'completed' }, createdAt: month(4) },
+    { id: 'audit-009', actorId: 'user-007', actorName: 'Hồ Thị Lan', actorRole: 'accountant', action: 'payment_confirmed', entityType: 'payment', entityId: 'pay-011', before: { status: 'pending' }, after: { status: 'confirmed' }, createdAt: month(4) },
+    { id: 'audit-010', actorId: 'user-010', actorName: 'Trương Văn Khoa', actorRole: 'coordinator', action: 'case_status_changed', entityType: 'case', entityId: 'case-006', before: { status: 'scheduled' }, after: { status: 'in_procedure' }, createdAt: month(4) },
+    { id: 'audit-011', actorId: 'user-011', actorName: 'Phạm Ngọc Điệp', actorRole: 'cskh_postop', action: 'followup_completed', entityType: 'followup', entityId: 'fup-case006-D7', before: { status: 'pending' }, after: { status: 'completed', painLevel: 1 }, createdAt: month(4) },
+    { id: 'audit-012', actorId: 'user-012', actorName: 'Lý Minh Tú', actorRole: 'media', action: 'attachment_uploaded', entityType: 'attachment', entityId: 'att-case004-before', after: { type: 'before_image', fileName: 'before-mentor-boost-ha.jpg' }, createdAt: month(4) },
+
+    // ── May 2026 ──────────────────────────────────────────
+    { id: 'audit-013', actorId: 'user-004', actorName: 'Trần Minh Sang', actorRole: 'master_sales', action: 'case_created', entityType: 'case', entityId: 'case-004', after: { caseCode: 'SW-260623-001', customerId: 'cus-004' }, createdAt: month(2) },
+    { id: 'audit-014', actorId: 'user-005', actorName: 'Nguyễn Thị Lan Anh', actorRole: 'sales_online', action: 'customer_created', entityType: 'customer', entityId: 'cus-012', after: { fullName: 'Trương Thị Mỹ Duyên' }, createdAt: month(2) },
+    { id: 'audit-015', actorId: 'user-006', actorName: 'Phạm Văn Hùng', actorRole: 'sales_offline', action: 'customer_created', entityType: 'customer', entityId: 'cus-015', after: { fullName: 'Nguyễn Thị Lan' }, createdAt: month(2) },
+    { id: 'audit-016', actorId: 'user-004', actorName: 'Trần Minh Sang', actorRole: 'master_sales', action: 'consent_updated', entityType: 'consent', entityId: 'con-cus004-treatment', before: { consentStatus: 'pending' }, after: { consentStatus: 'granted', signedBy: 'cus-004' }, createdAt: month(2) },
+    { id: 'audit-017', actorId: 'user-007', actorName: 'Hồ Thị Lan', actorRole: 'accountant', action: 'payment_confirmed', entityType: 'payment', entityId: 'pay-012', before: { status: 'pending' }, after: { status: 'confirmed' }, createdAt: month(2) },
+
+    // ── Jun 2026 (recent) ─────────────────────────────────
+    { id: 'audit-018', actorId: 'user-004', actorName: 'Trần Minh Sang', actorRole: 'master_sales', action: 'case_status_changed', entityType: 'case', entityId: 'case-001', before: { status: 'draft' }, after: { status: 'waiting_payment_confirmation' }, createdAt: day(14) },
+    { id: 'audit-019', actorId: 'user-004', actorName: 'Trần Minh Sang', actorRole: 'master_sales', action: 'staff_assignment_changed', entityType: 'case', entityId: 'case-001', before: {}, after: { masterSalesId: 'user-004', coordinatorId: 'user-010' }, createdAt: day(14) },
+    { id: 'audit-020', actorId: 'user-006', actorName: 'Phạm Văn Hùng', actorRole: 'sales_offline', action: 'case_created', entityType: 'case', entityId: 'case-007', after: { caseCode: 'SW-260609-001', customerId: 'cus-007' }, createdAt: day(12) },
+    { id: 'audit-021', actorId: 'user-004', actorName: 'Trần Minh Sang', actorRole: 'master_sales', action: 'case_status_changed', entityType: 'case', entityId: 'case-002', before: { status: 'draft' }, after: { status: 'payment_confirmed' }, createdAt: day(9) },
+    { id: 'audit-022', actorId: 'user-007', actorName: 'Hồ Thị Lan', actorRole: 'accountant', action: 'payment_confirmed', entityType: 'payment', entityId: 'pay-003', before: { status: 'pending' }, after: { status: 'confirmed' }, createdAt: day(8) },
+    { id: 'audit-023', actorId: 'user-007', actorName: 'Hồ Thị Lan', actorRole: 'accountant', action: 'payment_confirmed', entityType: 'payment', entityId: 'pay-004', before: { status: 'pending' }, after: { status: 'confirmed' }, createdAt: day(5) },
+    { id: 'audit-024', actorId: 'user-010', actorName: 'Trương Văn Khoa', actorRole: 'coordinator', action: 'case_status_changed', entityType: 'case', entityId: 'case-002', before: { status: 'waiting_hospital_confirmation' }, after: { status: 'hospital_confirmed' }, createdAt: day(7) },
+    { id: 'audit-025', actorId: 'user-012', actorName: 'Lý Minh Tú', actorRole: 'media', action: 'attachment_visibility_changed', entityType: 'attachment', entityId: 'att-case004-after', before: { visibility: 'private' }, after: { visibility: 'media_approved' }, createdAt: day(5) },
+    { id: 'audit-026', actorId: 'user-011', actorName: 'Phạm Ngọc Điệp', actorRole: 'cskh_postop', action: 'task_completed', entityType: 'task', entityId: 'task-007', before: { status: 'todo' }, after: { status: 'done' }, createdAt: day(3) },
+    { id: 'audit-027', actorId: 'user-005', actorName: 'Nguyễn Thị Lan Anh', actorRole: 'sales_online', action: 'customer_created', entityType: 'customer', entityId: 'cus-016', after: { fullName: 'Đỗ Thị Huyền Trang' }, createdAt: day(7) },
+    { id: 'audit-028', actorId: 'user-004', actorName: 'Trần Minh Sang', actorRole: 'master_sales', action: 'payment_created', entityType: 'payment', entityId: 'pay-002', after: { amount: 30000000, caseId: 'case-001' }, createdAt: day(1) },
+    { id: 'audit-029', actorId: 'user-007', actorName: 'Hồ Thị Lan', actorRole: 'accountant', action: 'payment_confirmed', entityType: 'payment', entityId: 'pay-015', before: { status: 'pending' }, after: { status: 'confirmed' }, createdAt: day(9) },
+    { id: 'audit-030', actorId: 'user-011', actorName: 'Phạm Ngọc Điệp', actorRole: 'cskh_postop', action: 'followup_completed', entityType: 'followup', entityId: 'fup-case011-D30', before: { status: 'pending' }, after: { status: 'contacted' }, createdAt: day(5) },
   ];
   for (const l of logs) col.set(l.id, l as Record<string, unknown>);
 }

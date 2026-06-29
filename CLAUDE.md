@@ -24,7 +24,8 @@ Hệ thống quản lý khách hàng và hồ sơ phẫu thuật thẩm mỹ cho
 | Phase 2 | ✅ Completed | Customers (dialog CRUD + delete approval), Cases, Services, Payments, Staff assignment |
 | Phase 3 | ✅ Completed | Treatment locations, Calendar, Tasks, Checklist, Status workflow, Premium theme |
 | Phase 4 | ✅ Completed | Attachments, Consent, Post-op follow-up, Notifications, Audit logs |
-| Phase 5 | 🔜 Pending | Reports, Seed data, Security rules, Vercel deployment |
+| Phase 5 | ✅ Completed (partial) | **Reports** (3 tabs: Revenue / Pipeline / Customer), **Seed data expansion** (payments 23, followups 26, audit logs 30) |
+| Phase 5 (remaining) | 🔜 Pending | Security rules (firebase.json + storage.rules + indexes), Vercel deployment |
 
 ---
 
@@ -32,7 +33,7 @@ Hệ thống quản lý khách hàng và hồ sơ phẫu thuật thẩm mỹ cho
 
 - `npx tsc --noEmit` → 0 errors
 - `npm run lint` → 0 warnings
-- `npm run build` → 30 routes, 0 errors
+- `npm run build` → 31 routes, 0 errors (`/reports` 128 kB / 357 kB First Load JS)
 
 ---
 
@@ -140,6 +141,70 @@ Hệ thống quản lý khách hàng và hồ sơ phẫu thuật thẩm mỹ cho
 
 ---
 
+## Phase 5 — Reports + Seed Expansion (Completed ✅)
+
+### Phase 5 Features
+
+- [x] **Reports page** (`/reports`) — 3 tabs với charts (Recharts) + filter theo khoảng thời gian
+- [x] **Revenue tab** — 4 stat cards (tổng / đã xác nhận / chờ / trung bình ca) + Line chart xu hướng tháng (confirmed + pending) + Pie chart phương thức thanh toán
+- [x] **Pipeline tab** — Custom funnel 5 giai đoạn (Khởi tạo → Xác nhận → Xếp lịch → Thực hiện → Hậu phẫu) + Horizontal bar chart trạng thái + Vertical bar chart theo dịch vụ
+- [x] **Customer tab** — Pie chart nguồn khách (7) + Pie chart mức bảo mật (3) + Bar chart khách mới theo tháng
+- [x] **Date range filter** — 3 / 6 / 12 tháng / Tất cả (pill buttons)
+- [x] **Loading skeletons** — StatCards + Chart skeletons match design system
+- [x] **Shared utilities extracted** — `formatCompact`, `formatVNDCompact`, `getMonthKey`, `getMonthLabel`, `formatPercent` từ `stat-cards.tsx` → `src/lib/utils/format.ts`
+- [x] **Constants cho charts** — `CASE_STATUS_HEX`, `PAYMENT_METHOD_HEX`, `CUSTOMER_SOURCE_HEX`, `PRIVACY_LEVEL_HEX`, `PIPELINE_STAGES`, `getPipelineStage()`
+- [x] **Seed data expansion** — payments 6→23, followups 6→26, audit logs 14→30 (phân bổ 6 tháng)
+
+### Critical files (Phase 5)
+
+**Reports page & components**
+- `src/app/(protected)/reports/page.tsx` — page chính với Tabs + ReportFilters + 3 wrappers
+- `src/components/reports/revenue-report.tsx` — Revenue tab wrapper
+- `src/components/reports/pipeline-report.tsx` — Pipeline tab wrapper
+- `src/components/reports/customer-report.tsx` — Customer tab wrapper
+- `src/components/reports/revenue-trend-chart.tsx` — Line chart doanh thu theo tháng
+- `src/components/reports/payment-method-chart.tsx` — Pie chart phương thức thanh toán
+- `src/components/reports/status-bar-chart.tsx` — Horizontal bar chart trạng thái case
+- `src/components/reports/category-bar-chart.tsx` — Vertical bar chart theo dịch vụ
+- `src/components/reports/pipeline-funnel.tsx` — Custom SVG funnel 5 giai đoạn
+- `src/components/reports/source-pie-chart.tsx` — Pie chart nguồn khách
+- `src/components/reports/privacy-pie-chart.tsx` — Pie chart privacy level
+- `src/components/reports/new-customers-chart.tsx` — Bar chart khách mới theo tháng
+- `src/components/reports/stat-summary.tsx` — 4 stat cards cho revenue tab
+- `src/components/reports/chart-card.tsx` — Wrapper Card với title + icon
+- `src/components/reports/chart-theme.ts` — Brand colors + Recharts style helpers (AXIS_STYLE, TOOLTIP_STYLE, GRID_STYLE, tooltipFormatVND/Count)
+- `src/components/reports/loading-skeleton.tsx` — ChartSkeleton + StatCardsSkeleton
+- `src/components/reports/report-filters.tsx` — Date range pill buttons
+
+**New constants**
+- `src/constants/payment-methods.ts` — PAYMENT_METHOD_LABELS, PAYMENT_METHOD_HEX
+- `src/constants/customer-meta.ts` — CUSTOMER_SOURCE_LABELS, PRIVACY_LEVEL_LABELS, hex colors
+- `src/constants/case-status.ts` — thêm CASE_STATUS_HEX, PIPELINE_STAGES, getPipelineStage()
+
+**Modified files**
+- `src/lib/utils/format.ts` — thêm formatCompact, formatVNDCompact, getMonthKey, getMonthLabel, formatPercent
+- `src/components/dashboard/stat-cards.tsx` — dùng formatCompact từ shared utils
+- `src/lib/mock/store.ts` — seed data mở rộng (payments, followups, audit logs)
+
+### Phase 5 Seed Data (Expanded)
+
+| Entity | Before | After | Note |
+|--------|--------|-------|------|
+| Payments | 6 | 23 | Phân bổ 6 tháng, 5 phương thức, có pending/refund |
+| Followups | 6 | 26 | 4 cases có followup trail (case 5/6/11/17/19) |
+| Audit logs | 14 | 30 | Spread Jan–Jun 2026, 6+ actor roles, 10+ action types |
+
+### Chart Library
+
+`recharts@3.9.0` đã có sẵn trong `package.json`. Phase 5 là lần đầu sử dụng. Khi build Recharts components, dùng helper `tooltipFormatVND` / `tooltipFormatCount` từ `chart-theme.ts` để tránh type error của Recharts v3.
+
+### Phase 5 Pending (chưa làm)
+
+- **Firebase security rules** — `firestore.rules` đã có (316 dòng, RBAC đầy đủ) nhưng **thiếu** `firebase.json`, `firestore.indexes.json`, `storage.rules` để deploy
+- **Vercel deployment** — chưa có `vercel.json`, security headers, deployment docs
+
+---
+
 ## Premium Theme (Applied globally)
 
 ### Design System
@@ -218,7 +283,7 @@ src/
 │   │   ├── tasks/                       # List + create form
 │   │   ├── followups/                   # Post-op follow-up dashboard
 │   │   ├── media-library/               # Attachments grid + upload
-│   │   ├── reports/                     # Stub (Phase 5)
+│   │   ├── reports/                     # Reports page — 3 tabs (Revenue/Pipeline/Customer) (Phase 5)
 │   │   ├── settings/                    # users / roles / services / treatment-locations
 │   │   ├── notifications/               # In-app notification center
 │   │   └── audit-logs/                  # Audit trail with filters + diff view
@@ -258,7 +323,24 @@ src/
 │   ├── tasks/                           # TaskList, TaskForm
 │   ├── followups/                       # FollowupList, FollowupForm
 │   ├── attachments/                     # AttachmentUploadDialog, AttachmentList
-│   └── consents/                        # ConsentPanel (create + status transitions)
+│   ├── consents/                        # ConsentPanel (create + status transitions)
+│   └── reports/                         # Reports page components (Phase 5)
+│       ├── revenue-report.tsx           # Revenue tab wrapper
+│       ├── pipeline-report.tsx          # Pipeline tab wrapper
+│       ├── customer-report.tsx          # Customer tab wrapper
+│       ├── revenue-trend-chart.tsx      # Line chart
+│       ├── payment-method-chart.tsx     # Pie chart
+│       ├── status-bar-chart.tsx         # Horizontal bar chart
+│       ├── category-bar-chart.tsx       # Vertical bar chart
+│       ├── pipeline-funnel.tsx          # Custom SVG funnel
+│       ├── source-pie-chart.tsx         # Pie chart
+│       ├── privacy-pie-chart.tsx        # Pie chart
+│       ├── new-customers-chart.tsx      # Bar chart
+│       ├── stat-summary.tsx             # 4 stat cards
+│       ├── chart-card.tsx               # Reusable Card wrapper
+│       ├── chart-theme.ts               # Recharts style helpers
+│       ├── loading-skeleton.tsx         # ChartSkeleton, StatCardsSkeleton
+│       └── report-filters.tsx           # Date range filter pills
 │
 ├── lib/
 │   ├── firebase/                        # client.ts, admin.ts, auth.ts, firestore.ts, storage.ts
@@ -270,8 +352,8 @@ src/
 │   ├── notifications/                   # in-app, telegram, templates
 │   ├── checklist/                       # evaluatePreHospitalChecklist, evaluatePreProcedureChecklist
 │   ├── tasks/                           # auto-tasks (triggerAutoTasks)
-│   ├── mock/store.ts                    # In-memory mock data + 15 seed functions
-│   └── utils/                           # cn, format, validation
+│   ├── mock/store.ts                    # In-memory mock data + 16 seed functions
+│   └── utils/                           # cn, format (formatCompact, formatVNDCompact, getMonthKey, formatPercent), validation
 │
 ├── config/
 │   ├── firebase.ts                      # Config, isDevMode, hasFirebaseConfig
@@ -279,9 +361,11 @@ src/
 │   └── constants.ts                     # APP_NAME, PAGE_TITLES
 │
 └── constants/
-    ├── case-status.ts                   # Status labels, colors, transitions, post-op statuses
+    ├── case-status.ts                   # Status labels, colors, transitions, post-op statuses, CASE_STATUS_HEX, PIPELINE_STAGES
     ├── permissions.ts                   # SENSITIVE_FIELD_ACCESS, MEDICAL_NOTE_ACCESS, DELETE_APPROVE_ROLES
-    └── service-categories.ts            # Service category labels
+    ├── service-categories.ts            # Service category labels
+    ├── payment-methods.ts               # PAYMENT_METHOD_LABELS, PAYMENT_METHOD_HEX (Phase 5)
+    └── customer-meta.ts                 # CUSTOMER_SOURCE, PRIVACY_LEVEL labels + hex (Phase 5)
 ```
 
 ---
@@ -372,3 +456,6 @@ Tất cả firestore helpers tự động rẽ vào mock store khi `isDevMode &&
 - **Attachment upload**: `attachment-upload-dialog` tự ghi audit log khi upload. Trong dev mode, file lưu mock URL — không cần Firebase Storage thật.
 - **Consent workflow**: 4 types (treatment, image_storage, marketing_usage, hospital_sharing). Status workflow: pending → granted/denied/revoked. Mọi thay đổi status đều ghi audit log.
 - **Follow-up auto-create**: `createPostOpFollowups(caseId)` tạo D1/D3/D7/D14/D30/D90 tự động. Trigger khi case chuyển sang `procedure_completed`.
+- **Reports charts (Recharts v3)**: Tooltip `formatter` callback types rất lỏng (`ValueType | undefined`). Dùng helper `tooltipFormatVND` / `tooltipFormatCount` từ `@/components/reports/chart-theme.ts` thay vì inline arrow function với type `number` — sẽ bị TS error.
+- **`getMonthLabel(input)`**: Chấp nhận cả `Date` lẫn `number` (month index 0-11). Phase 5 dùng cả 2 dạng tùy context.
+- **Chart colors**: Recharts không nhận Tailwind classes (vd `bg-swan-500`). Phải dùng hex từ `CASE_STATUS_HEX` / `PAYMENT_METHOD_HEX` / `CUSTOMER_SOURCE_HEX` / `PRIVACY_LEVEL_HEX`.

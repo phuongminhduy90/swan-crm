@@ -2,7 +2,9 @@
 
 Hệ thống quản lý khách hàng và hồ sơ phẫu thuật thẩm mỹ cho Swan Clinic.
 
-**Current status:** Phase 1, 2, 3, 4 đã hoàn thành — full project scaffold, authentication, role-based access control, customers (với dialog CRUD + delete approval), cases, payments, services, tasks, calendar, checklist, status workflow, attachments, consents, post-op follow-ups, notifications, audit logs, và premium Apple/Stripe-style theme.
+**Current status:** Phase 1–4 đã hoàn thành + Phase 5 (Reports + Seed expansion). Full project scaffold, authentication, role-based access control, customers (với dialog CRUD + delete approval), cases, payments, services, tasks, calendar, checklist, status workflow, attachments, consents, post-op follow-ups, notifications, audit logs, **reports page (3 tabs với charts)**, và premium Apple/Stripe-style theme.
+
+> Phase 5 còn lại (chưa làm): Firebase security rules (`firebase.json`, `storage.rules`, `firestore.indexes.json`) + Vercel deployment config.
 
 ## Tech Stack
 
@@ -12,6 +14,7 @@ Hệ thống quản lý khách hàng và hồ sơ phẫu thuật thẩm mỹ cho
 - **Firebase Admin SDK** (server-side privileged operations)
 - **React Hook Form** + **Zod** validation
 - **Lucide React** icons
+- **Recharts** cho reports (Phase 5)
 
 ## Brand Colors
 
@@ -68,7 +71,7 @@ Khi dev mode được bật, app chạy **hoàn toàn bằng mock data in-memory
 - ✅ **User management**: đọc / tạo / sửa / kích hoạt / ngừng hoạt động — không cần Firebase Admin SDK
 - ✅ **Firestore calls**: tất cả CRUD (`getDocument`, `setDocument`, `updateDocument`, `deleteDocument`, `getAllDocuments`) tự động rẽ vào mock store ở server
 - ✅ **API routes**: bypass Admin SDK, thao tác trực tiếp trên mock store
-- ✅ **Seed data**: 12 users (mỗi role 1) + 20 customers + 20 cases + 21 case-services + 6 payments + 6 followups + 7 tasks + 7 appointments + 3 hospital coordinations + 5 staff assignments + 4 locations + 17 services + 8 attachments + 10 consents + 10 notifications + 14 audit logs
+- ✅ **Seed data**: 12 users (mỗi role 1) + 20 customers + 20 cases + 21 case-services + **23 payments** + **26 followups** + 7 tasks + 7 appointments + 3 hospital coordinations + 5 staff assignments + 4 locations + 17 services + 8 attachments + 10 consents + 10 notifications + **30 audit logs**
 
 **Không cần** bất kỳ biến môi trường Firebase nào. Dữ liệu reset khi restart server.
 
@@ -97,6 +100,7 @@ Bypass login bằng cách truy cập trực tiếp:
 - [http://localhost:3000/tasks](http://localhost:3000/tasks) — Công việc
 - [http://localhost:3000/payments](http://localhost:3000/payments) — Thanh toán
 - [http://localhost:3000/followups](http://localhost:3000/followups) — Theo dõi sau PT
+- [http://localhost:3000/reports](http://localhost:3000/reports) — Báo cáo (doanh thu / pipeline / khách hàng)
 - [http://localhost:3000/media-library](http://localhost:3000/media-library) — Thư viện tài liệu (ảnh, PDF)
 - [http://localhost:3000/notifications](http://localhost:3000/notifications) — Thông báo
 - [http://localhost:3000/audit-logs](http://localhost:3000/audit-logs) — Nhật ký hoạt động
@@ -129,8 +133,8 @@ src/
 │   │   ├── calendar/                 # Week/month view + appointment modal
 │   │   ├── tasks/                    # List + create form
 │   │   ├── followups/                # Post-op follow-up (today / overdue / upcoming)
+│   │   ├── reports/                  # Reports page — 3 tabs (Revenue/Pipeline/Customer) + filter (Phase 5)
 │   │   ├── media-library/            # Attachments grid + upload
-│   │   ├── reports/                  # Stub (Phase 5)
 │   │   ├── settings/                 # users / roles / services / treatment-locations
 │   │   ├── notifications/            # In-app notification center
 │   │   └── audit-logs/               # Audit trail with filters + diff view
@@ -154,7 +158,8 @@ src/
 │   ├── tasks/                        # TaskList, TaskForm
 │   ├── followups/                    # FollowupList, FollowupForm
 │   ├── attachments/                  # AttachmentUploadDialog, AttachmentList
-│   └── consents/                     # ConsentPanel (create + status transitions)
+│   ├── consents/                     # ConsentPanel (create + status transitions)
+│   └── reports/                      # Reports page components — 3 tab wrappers + 8 charts + skeleton/filters (Phase 5)
 ├── lib/
 │   ├── firebase/                     # Client + Admin SDK + Storage helpers
 │   ├── auth/                         # AuthProvider, RBAC, mock users
@@ -165,16 +170,18 @@ src/
 │   ├── notifications/                # in-app, telegram, templates
 │   ├── checklist/                    # evaluatePreHospitalChecklist, evaluatePreProcedureChecklist
 │   ├── tasks/                        # auto-tasks (triggerAutoTasks)
-│   ├── mock/store.ts                 # In-memory mock data + 15 seed functions
-│   └── utils/                        # cn, format, validation
+│   ├── mock/store.ts                 # In-memory mock data + 16 seed functions
+│   └── utils/                        # cn, format (formatCompact, formatVNDCompact, getMonthKey, formatPercent), validation
 ├── config/
 │   ├── firebase.ts                   # Config, isDevMode, hasFirebaseConfig
 │   ├── roles.ts                      # ROLE_LABELS, ROLE_PERMISSIONS
 │   └── constants.ts                  # APP_NAME, PAGE_TITLES
 └── constants/
-    ├── case-status.ts                # Status labels, colors, transitions, post-op statuses
+    ├── case-status.ts                # Status labels, colors, transitions, post-op statuses, CASE_STATUS_HEX, PIPELINE_STAGES
     ├── permissions.ts                # Permission constants (SENSITIVE_FIELD, MEDICAL_NOTE, DELETE_APPROVE, ...)
-    └── service-categories.ts         # Service category labels
+    ├── service-categories.ts         # Service category labels
+    ├── payment-methods.ts            # PAYMENT_METHOD_LABELS + HEX (Phase 5)
+    └── customer-meta.ts              # CUSTOMER_SOURCE + PRIVACY_LEVEL labels + hex (Phase 5)
 ```
 
 ## Roles & Permissions
@@ -265,10 +272,23 @@ Permission matrix defined in `src/config/roles.ts` and `src/constants/permission
 - **Audit logs**: 18 AuditAction types, filter theo entity/action/actor, expandable JSON diff cho state changes
 - Seed data: 8 attachments + 10 consents + 6 followups (D1-D90 cho case #5) + 10 notifications + 14 audit logs
 
-### 🔜 Phase 5 — Reports & Deployment
-- Reports (revenue, CASE pipeline, conversion)
-- Security rules (Firestore)
-- Vercel deployment
+### ✅ Phase 5 — Reports + Seed Expansion
+- **Reports page** (`/reports`) — 3 tabs với charts (Recharts) + filter khoảng thời gian (3/6/12 tháng / Tất cả)
+  - **Tab Doanh thu**: 4 stat cards (tổng / đã xác nhận / chờ / trung bình ca) + Line chart xu hướng doanh thu theo tháng (confirmed + pending) + Pie chart phương thức thanh toán (5 loại)
+  - **Tab Luồng CASE**: Custom pipeline funnel 5 giai đoạn (Khởi tạo → Xác nhận → Xếp lịch → Thực hiện → Hậu phẫu) + Horizontal bar chart trạng thái case + Vertical bar chart theo dịch vụ
+  - **Tab Khách hàng**: Pie chart nguồn khách (7 nguồn) + Pie chart mức bảo mật (3 levels) + Bar chart khách mới theo tháng
+- **Shared utilities**: `formatCompact`, `formatVNDCompact`, `getMonthKey`, `getMonthLabel`, `formatPercent` extracted to `src/lib/utils/format.ts`
+- **Chart constants**: `CASE_STATUS_HEX`, `PAYMENT_METHOD_HEX`, `CUSTOMER_SOURCE_HEX`, `PRIVACY_LEVEL_HEX`, `PIPELINE_STAGES` + `getPipelineStage()`
+- **Seed data expansion**:
+  - Payments: 6 → 23 (phân bổ 6 tháng, 5 phương thức, confirmed/pending/refund)
+  - Followups: 6 → 26 (4 cases có followup trail D1→D90)
+  - Audit logs: 14 → 30 (spread Jan–Jun 2026, 6+ actor roles)
+- Loading skeletons (ChartSkeleton + StatCardsSkeleton) match design system
+
+### 🔜 Phase 5 (còn lại) — Deployment
+- **Firebase config files**: `firebase.json`, `.firebaserc`, `firestore.indexes.json`, `storage.rules` (chưa có)
+- **Vercel deployment**: `vercel.json`, security headers, deployment docs (chưa có)
+- `firestore.rules` đã có sẵn (316 dòng, RBAC đầy đủ + field-level security) — chỉ cần file config để deploy
 
 ## Tech Highlights
 
@@ -312,5 +332,7 @@ Permission matrix defined in `src/config/roles.ts` and `src/constants/permission
 - **Consents** — 4 loại (treatment, image_storage, marketing_usage, hospital_sharing), workflow pending → granted/denied/revoked
 - **Follow-ups** — auto-create D1/D3/D7/D14/D30/D90 khi case chuyển sang `procedure_completed`
 - **Audit logging** — 18 action types, ghi tự động ở attachment upload/delete, consent status change
+- **Reports page** — `/reports` với 3 tabs (Revenue/Pipeline/Customer), filter theo khoảng thời gian, dùng Recharts. Tất cả charts nhận hex colors từ `chart-theme.ts` (không phải Tailwind classes).
+- **Seed data coverage** — payments (23) spread 6 tháng, followups (26) cho 4 cases, audit logs (30) spread Jan–Jun 2026
 
 Xem `CLAUDE.md` để biết thêm về conventions, project structure, và bug fixes.

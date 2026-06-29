@@ -101,3 +101,74 @@ export const POST_OP_STATUSES: CaseStatus[] = [
 ];
 
 export const TERMINAL_STATUSES: CaseStatus[] = ['completed', 'cancelled'];
+
+// Hex colors for chart visualizations (Recharts doesn't accept Tailwind classes)
+export const CASE_STATUS_HEX: Record<CaseStatus, string> = {
+  draft: '#9CA3AF',
+  waiting_customer_info: '#F97316',
+  waiting_payment_confirmation: '#F59E0B',
+  payment_confirmed: '#10B981',
+  waiting_location_assignment: '#0EA5E9',
+  waiting_hospital_confirmation: '#06B6D4',
+  hospital_confirmed: '#14B8A6',
+  waiting_doctor_review: '#8B5CF6',
+  waiting_lab_test: '#6366F1',
+  lab_test_done: '#3B82F6',
+  medically_approved: '#22C55E',
+  scheduled: '#00ADBE',
+  reminder_sent: '#00B5C4',
+  checked_in: '#0E9DAB',
+  in_procedure: '#C9A96E',
+  procedure_completed: '#16A34A',
+  waiting_images_upload: '#EAB308',
+  post_op_d1: '#EC4899',
+  post_op_d3: '#EC4899',
+  post_op_d7: '#EC4899',
+  post_op_d14: '#F43F5E',
+  post_op_d30: '#F43F5E',
+  post_op_d90: '#F43F5E',
+  completed: '#6B7280',
+  postponed: '#64748B',
+  cancelled: '#EF4444',
+  complaint: '#DC2626',
+  medical_alert: '#EA580C',
+};
+
+// Pipeline funnel — high-level status groups used in pipeline chart
+export const PIPELINE_STAGES = [
+  { key: 'draft', label: 'Khởi tạo' },
+  { key: 'confirmed', label: 'Xác nhận' },
+  { key: 'scheduled', label: 'Xếp lịch' },
+  { key: 'in_procedure', label: 'Thực hiện' },
+  { key: 'post_op', label: 'Hậu phẫu' },
+] as const;
+
+export type PipelineStageKey = (typeof PIPELINE_STAGES)[number]['key'];
+
+/**
+ * Map a CaseStatus to a high-level pipeline stage.
+ */
+export function getPipelineStage(status: CaseStatus): PipelineStageKey | null {
+  if (status === 'draft' || status === 'waiting_customer_info') return 'draft';
+  if (
+    status === 'waiting_payment_confirmation' ||
+    status === 'payment_confirmed' ||
+    status === 'waiting_location_assignment' ||
+    status === 'waiting_hospital_confirmation' ||
+    status === 'hospital_confirmed' ||
+    status === 'waiting_doctor_review' ||
+    status === 'waiting_lab_test' ||
+    status === 'lab_test_done' ||
+    status === 'medically_approved'
+  ) {
+    return 'confirmed';
+  }
+  if (status === 'scheduled' || status === 'reminder_sent' || status === 'checked_in') {
+    return 'scheduled';
+  }
+  if (status === 'in_procedure' || status === 'procedure_completed' || status === 'waiting_images_upload') {
+    return 'in_procedure';
+  }
+  if (POST_OP_STATUSES.includes(status)) return 'post_op';
+  return null; // completed/cancelled/postponed/complaint/medical_alert
+}

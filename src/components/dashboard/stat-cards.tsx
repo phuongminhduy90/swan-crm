@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Users, FolderOpen, TrendingUp, Calendar } from 'lucide-react';
 import { getAllCustomers, getAllCases, getAllPayments, getAllAppointments } from '@/lib/firestore';
 import { cn } from '@/lib/utils/cn';
+import { formatCompact } from '@/lib/utils/format';
 
 interface Stat {
   label: string;
@@ -96,11 +97,4 @@ export function StatCards() {
       })}
     </div>
   );
-}
-
-function formatCompact(n: number): string {
-  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
-  return new Intl.NumberFormat('vi-VN').format(n);
 }
