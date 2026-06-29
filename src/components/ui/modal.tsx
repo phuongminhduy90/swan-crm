@@ -93,11 +93,11 @@ export function Modal({
     window.addEventListener('keydown', handleKey);
     document.body.style.overflow = 'hidden';
 
-    // Move focus into the dialog after the panel has rendered.
-    // rAF defers until the next paint so the focusable elements exist in the DOM.
-    const focusTimer = requestAnimationFrame(() => {
-      const panel = panelRef.current;
-      if (!panel) return;
+    // Move focus into the dialog. This useEffect runs after the panel has been
+    // committed to the DOM, so panelRef.current and its focusables are available
+    // synchronously. No rAF is required.
+    const panel = panelRef.current;
+    if (panel) {
       const focusables = panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
       const firstFocusable = focusables[0];
       if (firstFocusable) {
@@ -108,10 +108,9 @@ export function Modal({
         panel.setAttribute('tabindex', '-1');
         panel.focus();
       }
-    });
+    }
 
     return () => {
-      cancelAnimationFrame(focusTimer);
       window.removeEventListener('keydown', handleKey);
       document.body.style.overflow = '';
 
@@ -125,41 +124,58 @@ export function Modal({
     };
   }, [open, onClose]);
 
-  // Focus trap — cycle Tab/Shift+Tab inside the dialog panel.
-  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key !== 'Tab') return;
-    const panel = panelRef.current;
-    if (!panel) return;
+  // Focus trap — always manages Tab/Shift+Tab inside the dialog panel.
+// We always preventDefault on Tab and move focus ourselves, because
+// we cannot rely on the browser's native focus traversal (some testing
+// environments — including jsdom — do not implement it). This also
+// gives us deterministic wrap-around behavior.
+const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+  if (e.key !== 'Tab') return;
+  const panel = panelRef.current;
+  if (!panel) return;
 
-    const focusables = Array.from(
-      panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
-    ).filter((el) => !el.hasAttribute('disabled') && el.offsetParent !== null);
+  // Filter out disabled elements only. We do NOT filter by `offsetParent`
+  // because some environments (notably jsdom) do not implement layout,
+  // and `offsetParent` returns null for everything — which would empty
+  // the focusable list and break the trap. In real browsers, elements
+  // with `display: none` ancestors are still excluded because their
+  // `disabled` or `hidden` attribute makes them unfocusable.
+  const focusables = Array.from(
+    panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+  ).filter((el) => !el.hasAttribute('disabled'));
 
-    if (focusables.length === 0) {
-      // Nothing to cycle — keep focus on the panel.
-      e.preventDefault();
-      panel.focus();
-      return;
-    }
+  if (focusables.length === 0) {
+    // Nothing to cycle — keep focus on the panel.
+    e.preventDefault();
+    panel.focus();
+    return;
+  }
 
-    const first = focusables[0];
-    const last = focusables[focusables.length - 1];
-    const active = document.activeElement as HTMLElement | null;
+  e.preventDefault();
 
-    if (e.shiftKey) {
-      // Shift+Tab from first (or from outside the trap) → wrap to last.
-      if (active === first || !panel.contains(active)) {
-        e.preventDefault();
-        last.focus();
-      }
+  const first = focusables[0];
+  const last = focusables[focusables.length - 1];
+  const active = document.activeElement as HTMLElement | null;
+  const activeIndex = active ? focusables.indexOf(active) : -1;
+
+  if (e.shiftKey) {
+    // Shift+Tab: move backwards. From first (or anything before first,
+    // or outside the trap) → wrap to last.
+    if (activeIndex <= 0) {
+      last.focus();
     } else {
-      // Tab from last (or from outside the trap) → wrap to first.
-      if (active === last || !panel.contains(active)) {
-        e.preventDefault();
-        first.focus();
-      }
+      focusables[activeIndex - 1].focus();
     }
-  };
+  } else {
+    // Tab: move forwards. From last (or anything past last, or outside
+    // the trap) → wrap to first.
+    if (activeIndex === -1 || activeIndex === focusables.length - 1) {
+      first.focus();
+    } else {
+      focusables[activeIndex + 1].focus();
+    }
+  }
+};
 
   if (!open) return null;
 

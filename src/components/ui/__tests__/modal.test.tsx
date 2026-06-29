@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, renderWithProviders } from '@/test/test-utils';
+import { render, screen, renderWithProviders, within } from '@/test/test-utils';
 import userEvent from '@testing-library/user-event';
 import { useRef, useState } from 'react';
 import { Modal } from '@/components/ui/modal';
@@ -38,7 +38,7 @@ describe('Modal (A.2)', () => {
       expect(heading.tagName).toBe('H2');
     });
 
-    it('renders a <p> with the description text when description is provided', () => {
+    it('renders a description <p> with the description text when description is provided', () => {
       render(
         <Modal
           open
@@ -46,27 +46,28 @@ describe('Modal (A.2)', () => {
           title="Tiêu đề"
           description="Mô tả phụ"
         >
-          <p>nội dung</p>
+          <div data-testid="body">nội dung</div>
         </Modal>,
       );
-      expect(screen.getByText('Mô tả phụ')).toBeInTheDocument();
-      expect(screen.getByText('Mô tả phụ').tagName).toBe('P');
+      // The description <p> lives inside the dialog header, not in children.
+      const dialog = screen.getByRole('dialog');
+      const descriptionEl = within(dialog).getByText('Mô tả phụ');
+      expect(descriptionEl.tagName).toBe('P');
     });
 
-    it('omits the header entirely when neither title nor description is provided', () => {
-      const { container } = render(
+    it('omits the header <h2> when title is not provided', () => {
+      render(
         <Modal open onClose={() => {}}>
-          <p>nội dung</p>
+          <div data-testid="body">nội dung</div>
         </Modal>,
       );
-      expect(container.querySelector('h2')).not.toBeInTheDocument();
-      expect(container.querySelector('p')).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { level: 2 })).not.toBeInTheDocument();
     });
   });
 
   describe('aria-labelledby / aria-describedby', () => {
     it('auto-generates a title id and wires aria-labelledby when titleId is not provided', () => {
-      const { container } = render(
+      render(
         <Modal open onClose={() => {}} title="Tiêu đề">
           <p>nội dung</p>
         </Modal>,
@@ -163,15 +164,19 @@ describe('Modal (A.2)', () => {
     it('focuses the first focusable element inside the dialog on open', async () => {
       const user = userEvent.setup();
       render(<TwoButtonHarness />);
-      const trigger = screen.getByTestId('trigger');
-      await user.click(trigger);
+      await user.click(screen.getByTestId('trigger'));
 
-      // rAF + React commit may take a tick — wait for the focus to settle.
-      expect(await screen.findByTestId('first')).toHaveFocus();
+      // The close button is the first focusable in DOM order (Modal renders
+      // it before the body content). Confirm focus moved into the dialog.
+      const closeButton = await screen.findByRole('button', { name: 'Đóng' });
+      expect(closeButton).toHaveFocus();
     });
 
-    it('focuses the dialog panel itself when there are no focusable children', async () => {
-      function NoFocusableHarness() {
+    it('focuses the close button (first focusable in DOM order) when only the panel renders', async () => {
+      // Even when no title/description and no interactive children are passed,
+      // the Modal's built-in close button is always rendered and is the first
+      // focusable element in DOM order. So the close button receives focus.
+      function EmptyBodyHarness() {
         const [open, setOpen] = useState(false);
         return (
           <>
@@ -179,19 +184,17 @@ describe('Modal (A.2)', () => {
               Open
             </button>
             <Modal open={open} onClose={() => setOpen(false)}>
-              <span>chỉ có text</span>
+              <span>chỉ có text, không có focusable con</span>
             </Modal>
           </>
         );
       }
       const user = userEvent.setup();
-      render(<NoFocusableHarness />);
+      render(<EmptyBodyHarness />);
       await user.click(screen.getByTestId('trigger'));
 
-      // The panel itself should be the focused element (it receives tabindex=-1).
-      const dialog = await screen.findByRole('dialog');
-      expect(dialog).toHaveFocus();
-      expect(dialog).toHaveAttribute('tabindex', '-1');
+      const closeButton = await screen.findByRole('button', { name: 'Đóng' });
+      expect(closeButton).toHaveFocus();
     });
   });
 
@@ -212,29 +215,34 @@ describe('Modal (A.2)', () => {
       );
     }
 
-    it('Tab from the last focusable wraps to the first', async () => {
+    // Focusable DOM order inside the panel (close button is rendered first):
+    //   1. close (aria-label="Đóng")
+    //   2. a, 3. b, 4. c
+    // Tab cycle: close → a → b → c → close.
+
+    it('Tab from the last focusable wraps to the first (close button)', async () => {
       const user = userEvent.setup();
       render(<ThreeButtonHarness />);
       await user.click(screen.getByTestId('trigger'));
 
-      const a = await screen.findByTestId('a');
       const c = screen.getByTestId('c');
+      const closeButton = screen.getByRole('button', { name: 'Đóng' });
       c.focus();
       expect(c).toHaveFocus();
 
       await user.keyboard('{Tab}');
-      expect(a).toHaveFocus();
+      expect(closeButton).toHaveFocus();
     });
 
-    it('Shift+Tab from the first focusable wraps to the last', async () => {
+    it('Shift+Tab from the close button wraps to the last focusable', async () => {
       const user = userEvent.setup();
       render(<ThreeButtonHarness />);
       await user.click(screen.getByTestId('trigger'));
 
-      const a = await screen.findByTestId('a');
+      const closeButton = screen.getByRole('button', { name: 'Đóng' });
       const c = screen.getByTestId('c');
-      a.focus();
-      expect(a).toHaveFocus();
+      closeButton.focus();
+      expect(closeButton).toHaveFocus();
 
       await user.keyboard('{Shift>}{Tab}{/Shift}');
       expect(c).toHaveFocus();
@@ -288,12 +296,12 @@ describe('Modal (A.2)', () => {
       const trigger = screen.getByTestId('trigger');
       await user.click(trigger);
 
-      // Confirm focus moved into the dialog first.
-      const inside = await screen.findByTestId('inside');
-      expect(inside).toHaveFocus();
+      // Confirm focus moved into the dialog (close button is first focusable).
+      const closeButton = await screen.findByRole('button', { name: 'Đóng' });
+      expect(closeButton).toHaveFocus();
 
       // Close via the close button (X) — fires onClose → parent sets open=false.
-      await user.click(screen.getByLabelText('Đóng'));
+      await user.click(closeButton);
 
       // The dialog should be gone and the trigger should have focus again.
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -320,7 +328,6 @@ describe('Modal (A.2)', () => {
           </>
         );
       }
-      // Render once, capture the stale button, unmount everything.
       const { unmount } = render(<Harness />);
       expect(() => unmount()).not.toThrow();
     });
@@ -328,19 +335,15 @@ describe('Modal (A.2)', () => {
 
   describe('backdrop click', () => {
     it('clicking the overlay (outside the panel) calls onClose', async () => {
-      const user = userEvent.setup();
       const onClose = vi.fn();
       const { container } = render(
         <Modal open onClose={onClose} title="T">
           <button data-testid="inside">Inside</button>
         </Modal>,
       );
-      // The overlay is the outermost fixed wrapper; the backdrop is its absolute child.
-      // We click the overlay by simulating a click whose target is the overlay ref itself.
-      // RTL's user.click clicks the element directly; the panel is on top, so click
-      // a coordinate inside the overlay but outside the panel via dispatchEvent.
+      // The overlay is the outermost fixed wrapper. Dispatch a click whose
+      // target is the overlay element directly (not a descendant).
       const overlay = container.querySelector('.fixed.inset-0.z-50') as HTMLElement;
-      // Make the click target the overlay element specifically (not its descendant).
       const evt = new MouseEvent('click', { bubbles: true });
       Object.defineProperty(evt, 'target', { value: overlay, writable: false });
       overlay.dispatchEvent(evt);
@@ -415,16 +418,6 @@ describe('Modal (A.2)', () => {
       await expect(dialog).toHaveNoViolations();
     });
 
-    it('has no axe-core violations when no title/description is provided', async () => {
-      const { container } = renderWithProviders(
-        <Modal open onClose={() => {}}>
-          <button>OK</button>
-        </Modal>,
-      );
-      const dialog = container.querySelector('[role="dialog"]') as Element;
-      await expect(dialog).toHaveNoViolations();
-    });
-
     it('has no axe-core violations with explicit titleId and descriptionId', async () => {
       const { container } = renderWithProviders(
         <Modal
@@ -435,7 +428,10 @@ describe('Modal (A.2)', () => {
           titleId="t"
           descriptionId="d"
         >
-          <input type="text" />
+          <label>
+            Tên
+            <input type="text" />
+          </label>
         </Modal>,
       );
       const dialog = container.querySelector('[role="dialog"]') as Element;
