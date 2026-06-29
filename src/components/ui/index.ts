@@ -7,6 +7,7 @@ export * from './card';
 export * from './skeleton';
 export * from './avatar';
 export * from './swan-logo';
+export * from './close-icon-button';
 export * from './modal';
 export * from './confirm-dialog';
 export * from './data-table';

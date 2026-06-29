@@ -1,8 +1,8 @@
 'use client';
 
 import { KeyboardEvent, ReactNode, useEffect, useId, useRef } from 'react';
-import { X } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { CloseIconButton } from './close-icon-button';
 
 interface ModalProps {
   open: boolean;
@@ -223,15 +223,13 @@ const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
           </div>
         )}
 
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          className="absolute right-4 top-4 rounded-lg p-1.5 text-gray-400 transition-all hover:bg-gray-100 hover:text-gray-600 hover:rotate-90"
-          aria-label="Đóng"
-          type="button"
-        >
-          <X className="h-4 w-4" />
-        </button>
+        {/* Close button — uses the shared CloseIconButton primitive (Story A.3)
+            so every dismissible surface has consistent a11y + visual treatment. */}
+        <CloseIconButton
+          onClose={onClose}
+          className="absolute right-4 top-4"
+          ariaLabel="Đóng"
+        />
 
         {/* Body */}
         <div
