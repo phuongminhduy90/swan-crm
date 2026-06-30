@@ -16,6 +16,66 @@ import { AuditAction, AuditEntityType, AuditLog } from '@/lib/types';
 import { ROLE_LABELS } from '@/config/roles';
 import { cn } from '@/lib/utils/cn';
 import { formatDateTimeVN } from '@/lib/utils/format';
+import { AUDIT_REDACTED_PLACEHOLDER } from '@/lib/firestore/audit';
+
+/**
+ * Story B.2.3 (F-MED-17) — Render the PII redaction placeholder in the
+ * audit log diff. The placeholder is `[ĐÃ ẨN]` (Vietnamese for "[HIDDEN]"),
+ * styled gray italic with a tooltip explaining why the value is hidden.
+ */
+const REDACTED_TOOLTIP = 'Thông tin nhạy cảm đã được ẩn vì lý do bảo mật';
+
+/**
+ * Recursively replace every value in `payload` that equals the redacted
+ * placeholder with a JSX node so the JSON pretty-print shows the styled
+ * placeholder instead of the raw string. Non-redacted values are left as
+ * primitives (objects/arrays are stringified by JSON.stringify below).
+ */
+function renderRedactedJson(payload: Record<string, unknown>): React.ReactNode {
+  const json = JSON.stringify(payload, null, 2);
+  if (!json.includes(AUDIT_REDACTED_PLACEHOLDER)) {
+    return json;
+  }
+
+  // Split the JSON string on placeholder occurrences so each can be
+  // rendered with the styled redacted chip. The boundary tokens
+  // (`"`, `,`, `:`, `}`, `]`, whitespace) ensure we match the placeholder
+  // only when it is a complete JSON string value, not part of a larger
+  // value.
+  const escapedPlaceholder = AUDIT_REDACTED_PLACEHOLDER.replace(
+    /[.*+?^${}()|[\]\\]/g,
+    '\\$&',
+  );
+  const redactionRegex = new RegExp(
+    `("${escapedPlaceholder}")|("[^"]*${escapedPlaceholder}[^"]*")`,
+    'g',
+  );
+
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let key = 0;
+
+  while ((match = redactionRegex.exec(json)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(json.slice(lastIndex, match.index));
+    }
+    parts.push(
+      <span
+        key={`redacted-${key++}`}
+        className="italic text-gray-500"
+        title={REDACTED_TOOLTIP}
+      >
+        {match[0]}
+      </span>,
+    );
+    lastIndex = redactionRegex.lastIndex;
+  }
+  if (lastIndex < json.length) {
+    parts.push(json.slice(lastIndex));
+  }
+  return parts;
+}
 
 const AUDIT_ACTION_LABELS: Record<AuditAction, { label: string; icon: React.ElementType; color: string }> = {
   customer_created: { label: 'Tạo khách hàng', icon: UserPlus, color: 'text-emerald-600 bg-emerald-50' },
@@ -223,7 +283,7 @@ export default function AuditLogsPage() {
                           <div>
                             <p className="mb-1.5 text-xs font-semibold uppercase text-gray-500">Trước</p>
                             <pre className="overflow-x-auto rounded-lg bg-white p-3 text-xs text-gray-700 ring-1 ring-gray-200">
-                              {JSON.stringify(log.before, null, 2)}
+                              {renderRedactedJson(log.before)}
                             </pre>
                           </div>
                         )}
@@ -231,7 +291,7 @@ export default function AuditLogsPage() {
                           <div>
                             <p className="mb-1.5 text-xs font-semibold uppercase text-gray-500">Sau</p>
                             <pre className="overflow-x-auto rounded-lg bg-white p-3 text-xs text-gray-700 ring-1 ring-gray-200">
-                              {JSON.stringify(log.after, null, 2)}
+                              {renderRedactedJson(log.after)}
                             </pre>
                           </div>
                         )}
