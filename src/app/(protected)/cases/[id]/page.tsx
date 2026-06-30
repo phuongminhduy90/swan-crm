@@ -137,6 +137,14 @@ export default function CaseDetailPage() {
 
   const [statusChanging, setStatusChanging] = useState(false);
 
+  // Story B.2.4 — pre-procedure checklist summary rendered in the
+  // `procedure_completed` second-confirm dialog.
+  const [checklistSummary, setChecklistSummary] = useState<{
+    allPassed: boolean;
+    passedCount: number;
+    totalCount: number;
+  } | null>(null);
+
   const canWrite = !!user && hasPermission(user.role, 'cases:write');
   const canStatusChange = !!user && CASE_STATUS_CHANGE_ROLES.includes(user.role);
   const canPaymentCreate = !!user && PAYMENT_CREATE_ROLES.includes(user.role);
@@ -176,6 +184,34 @@ export default function CaseDetailPage() {
     load();
     return () => { cancelled = true; };
   }, [caseId, refreshKey]);
+
+  // Story B.2.4 — compute pre-procedure checklist summary so the
+  // `procedure_completed` confirm dialog can show the gate state. Recomputed
+  // on every reload because checklist items are derived from the live case.
+  useEffect(() => {
+    let cancelled = false;
+    if (!caseId || !caseRecord) {
+      setChecklistSummary(null);
+      return;
+    }
+    (async () => {
+      try {
+        const { evaluatePreProcedureChecklist } = await import('@/lib/checklist');
+        const result = await evaluatePreProcedureChecklist(caseId);
+        if (cancelled) return;
+        const required = result.items.filter((i) => i.required);
+        setChecklistSummary({
+          allPassed: result.allPassed,
+          passedCount: required.filter((i) => i.passed).length,
+          totalCount: required.length,
+        });
+      } catch (err) {
+        console.error('[CaseDetail] Checklist summary load failed:', err);
+        if (!cancelled) setChecklistSummary(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [caseId, caseRecord, refreshKey]);
 
   function reload() { setRefreshKey((k) => k + 1); }
 
@@ -412,7 +448,40 @@ export default function CaseDetailPage() {
               <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-swan-600">Chuyển trạng thái</h3>
               <StatusWorkflow
                 currentStatus={caseRecord.status}
-                onTransition={async (newStatus) => {
+                initialProcedureDate={caseRecord.actualProcedureDate}
+                checklistSummary={checklistSummary ?? undefined}
+                sideEffectSummary={{
+                  followupsCount: 6,
+                  tasksDescription: 'Các task follow-up theo dòng trạng thái (CSKH, chụp ảnh, v.v.)',
+                }}
+                onTransition={async (newStatus, extra) => {
+                  // Story B.2.4 — when transitioning to `procedure_completed`,
+                  // persist the captured `actualProcedureDate` to the case
+                  // BEFORE flipping the status. This makes the date the
+                  // source of truth for D1–D90 followup scheduling.
+                  let procedureDateForFollowups: Date | undefined;
+                  if (newStatus === 'procedure_completed') {
+                    const captured = extra?.actualProcedureDate;
+                    if (captured) {
+                      const isoDate = new Date(`${captured}T00:00:00.000Z`);
+                      procedureDateForFollowups = isoDate;
+                      try {
+                        await updateCase(
+                          caseId,
+                          { actualProcedureDate: isoDate.toISOString() },
+                          user?.id ?? 'dev-user',
+                        );
+                        await writeAuditLog({
+                          actorId: user?.id ?? 'dev-user', actorName: user?.displayName ?? 'Dev',
+                          actorRole: user?.role ?? 'admin', action: 'case_updated',
+                          entityType: 'case', entityId: caseId,
+                          after: { actualProcedureDate: isoDate.toISOString() },
+                        });
+                      } catch (err) {
+                        console.error('[CaseDetail] Persist actualProcedureDate failed:', err);
+                      }
+                    }
+                  }
                   await updateCaseStatus(caseId, newStatus, user?.id ?? 'dev-user');
                   await writeAuditLog({
                     actorId: user?.id ?? 'dev-user', actorName: user?.displayName ?? 'Dev',
@@ -431,9 +500,11 @@ export default function CaseDetailPage() {
                   if (newStatus === 'procedure_completed') {
                     try {
                       const { createPostOpFollowups } = await import('@/lib/firestore/followups');
-                      const procedureDate = caseRecord.actualProcedureDate
-                        ? new Date(caseRecord.actualProcedureDate)
-                        : new Date();
+                      const procedureDate =
+                        procedureDateForFollowups ??
+                        (caseRecord.actualProcedureDate
+                          ? new Date(caseRecord.actualProcedureDate)
+                          : new Date());
                       await createPostOpFollowups(
                         caseId,
                         caseRecord.customerId,

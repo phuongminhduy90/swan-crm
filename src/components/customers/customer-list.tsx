@@ -401,7 +401,7 @@ export function CustomerList({ refresh, onEdit }: Props) {
         }
         confirmLabel="Từ chối"
         cancelLabel="Hủy"
-        variant="default"
+        variant="info"
         loading={rejecting}
       />
     </div>

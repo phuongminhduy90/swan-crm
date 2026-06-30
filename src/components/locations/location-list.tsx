@@ -191,7 +191,7 @@ export function LocationListTable({ refresh, onEdit }: Props) {
             : `Địa điểm "${confirmDeactivate?.name}" sẽ được kích hoạt trở lại.`
         }
         confirmLabel={confirmDeactivate?.active ? 'Ngừng hoạt động' : 'Kích hoạt'}
-        variant={confirmDeactivate?.active ? 'danger' : 'default'}
+        variant={confirmDeactivate?.active ? 'danger' : 'info'}
         loading={deactivating}
         onConfirm={handleDeactivate}
         onClose={() => setConfirmDeactivate(null)}
