@@ -23,6 +23,7 @@ import { Card } from '@/components/ui/card';
 import { Modal } from '@/components/ui/modal';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { CaseStatusBadge } from '@/components/cases/status-badge';
 import { BillSummary } from '@/components/cases/bill-summary';
 import { PaymentList } from '@/components/payments/payment-list';
@@ -137,6 +138,12 @@ export default function CaseDetailPage() {
   const [serviceModalOpen, setServiceModalOpen] = useState(false);
   const [serviceSubmitting, setServiceSubmitting] = useState(false);
   const [serviceError, setServiceError] = useState<string | null>(null);
+
+  // Story B.4.5 (F-MED-01) — replace native `confirm()` with
+  // `<ConfirmDialog variant="danger">`. Holds the pending serviceId so the
+  // dialog knows which row to remove on confirm.
+  const [removeServiceId, setRemoveServiceId] = useState<string | null>(null);
+  const [removeServiceSubmitting, setRemoveServiceSubmitting] = useState(false);
 
   const [staffEditOpen, setStaffEditOpen] = useState(false);
   const [staffSaving, setStaffSaving] = useState(false);
@@ -301,13 +308,17 @@ export default function CaseDetailPage() {
     }
   }
 
-  async function handleRemoveService(serviceId: string) {
-    if (!confirm('Xóa dịch vụ này?')) return;
+  async function handleRemoveServiceConfirm() {
+    if (!removeServiceId) return;
+    setRemoveServiceSubmitting(true);
     try {
-      await removeCaseService(serviceId);
+      await removeCaseService(removeServiceId);
       reload();
     } catch (err) {
       console.error('[CaseDetail] Remove service error:', err);
+    } finally {
+      setRemoveServiceSubmitting(false);
+      setRemoveServiceId(null);
     }
   }
 
@@ -635,7 +646,13 @@ export default function CaseDetailPage() {
                       {s.note && <p className="mt-1 text-xs text-gray-400">{s.note}</p>}
                     </div>
                     {canWrite && (
-                      <button onClick={() => handleRemoveService(s.id)} className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600">
+                      <button
+                        type="button"
+                        onClick={() => setRemoveServiceId(s.id)}
+                        aria-label={`Xóa dịch vụ ${s.serviceName}`}
+                        data-testid={`remove-service-${s.id}`}
+                        className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                      >
                         <Trash2 className="h-4 w-4" />
                       </button>
                     )}
@@ -844,6 +861,30 @@ export default function CaseDetailPage() {
         open={attachmentUploadOpen}
         onClose={() => setAttachmentUploadOpen(false)}
         onUploaded={() => setRefreshKey((k) => k + 1)}
+      />
+
+      {/* Story B.4.5 (F-MED-01) — A9 anti-pattern closure: the remove-
+          service action used to call the global confirm function (a native
+          browser dialog). It now opens a `<ConfirmDialog variant="danger">`
+          so the user sees the same focus-trap / ESC / aria-labelledby
+          contract as every other destructive action in the app. */}
+      <ConfirmDialog
+        open={removeServiceId !== null}
+        onClose={() => {
+          if (!removeServiceSubmitting) setRemoveServiceId(null);
+        }}
+        onConfirm={handleRemoveServiceConfirm}
+        title="Xóa dịch vụ?"
+        description={
+          <span>
+            Dịch vụ sẽ bị xóa khỏi hồ sơ CASE <strong>{caseRecord.caseCode}</strong>.
+            Hành động này không thể hoàn tác.
+          </span>
+        }
+        confirmLabel="Xóa dịch vụ"
+        cancelLabel="Hủy"
+        variant="danger"
+        loading={removeServiceSubmitting}
       />
     </div>
   );

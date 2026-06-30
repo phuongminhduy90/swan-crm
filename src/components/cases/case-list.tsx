@@ -12,11 +12,13 @@ import {
 import { CaseRecord, Customer, TreatmentLocation, CaseStatus, PaymentStatus } from '@/lib/types';
 import { DataTable } from '@/components/ui/data-table';
 import { SearchInput } from '@/components/ui/search-input';
+import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { CaseStatusBadge } from '@/components/cases/status-badge';
 import { SERVICE_CATEGORY_LABELS, SERVICE_CATEGORY_COLORS } from '@/constants/service-categories';
 import { CASE_STATUS_LABELS } from '@/constants/case-status';
 import { formatDateVN, formatPhone } from '@/lib/utils/format';
+import { useIsDesktop } from '@/lib/hooks/useMediaQuery';
 import { cn } from '@/lib/utils/cn';
 
 const PAGE_SIZE = 15;
@@ -128,6 +130,11 @@ interface CaseListProps {
 export function CaseList({ onTotalChange }: CaseListProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // B.4.6 — chips on `md+`, <Select> on `< md`. Default SSR / initial render
+  // is mobile-friendly (`<Select>`) so the layout never overflows during
+  // hydration at 360 px.
+  const isDesktop = useIsDesktop();
 
   const [cases, setCases] = useState<CaseRecord[]>([]);
   const [customersMap, setCustomersMap] = useState<Record<string, Customer>>({});
@@ -401,32 +408,68 @@ export function CaseList({ onTotalChange }: CaseListProps) {
         </div>
       )}
 
-      {/* Status Filter Chips */}
-      <div className="flex flex-wrap gap-2">
-        {STATUS_FILTER_OPTIONS.map((opt) => (
-          <button
-            key={opt.value}
-            onClick={() => updateStatusFilter(opt.value)}
-            className={cn(
-              'rounded-full border px-3 py-1 text-xs font-medium transition-all',
-              statusFilter === opt.value
-                ? 'border-swan-500 bg-swan-500 text-white shadow-sm'
-                : 'border-gray-200 bg-white text-gray-600 hover:border-swan-300 hover:bg-swan-50 hover:text-swan-700',
-            )}
+      {/* Status Filter — B.4.6 responsive
+          - `md+` (≥ 768 px): chips with per-status counts (existing behavior)
+          - `< md` (< 768 px): <Select> dropdown to prevent 12-status horizontal
+            overflow at 360 px (F-MED-06, anti-pattern M5)
+          Both UIs filter the list identically and honor the `?status=` URL param. */}
+      {isDesktop ? (
+        <div
+          className="flex flex-wrap gap-2"
+          data-testid="status-filter-chips"
+          aria-label="Lọc theo trạng thái"
+          role="group"
+        >
+          {STATUS_FILTER_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => updateStatusFilter(opt.value)}
+              aria-pressed={statusFilter === opt.value}
+              className={cn(
+                'rounded-full border px-3 py-1 text-xs font-medium transition-all min-h-[44px] sm:min-h-0',
+                statusFilter === opt.value
+                  ? 'border-swan-500 bg-swan-500 text-white shadow-sm'
+                  : 'border-gray-200 bg-white text-gray-600 hover:border-swan-300 hover:bg-swan-50 hover:text-swan-700',
+              )}
+            >
+              {opt.label}
+              {opt.value !== 'all' && (
+                <span className="ml-1 opacity-70">
+                  (
+                  {opt.value === 'post_op'
+                    ? cases.filter((c) => POST_OP_STATUSES.includes(c.status)).length
+                    : cases.filter((c) => c.status === opt.value).length}
+                  )
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div data-testid="status-filter-select">
+          <Select
+            value={statusFilter}
+            onChange={(e) => updateStatusFilter(e.target.value as StatusFilterValue)}
+            aria-label="Lọc theo trạng thái"
+            className="min-h-[44px]"
           >
-            {opt.label}
-            {opt.value !== 'all' && (
-              <span className="ml-1 opacity-70">
-                (
-                {opt.value === 'post_op'
-                  ? cases.filter((c) => POST_OP_STATUSES.includes(c.status)).length
-                  : cases.filter((c) => c.status === opt.value).length}
-                )
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
+            {STATUS_FILTER_OPTIONS.map((opt) => {
+              const count =
+                opt.value === 'all'
+                  ? cases.length
+                  : opt.value === 'post_op'
+                    ? cases.filter((c) => POST_OP_STATUSES.includes(c.status)).length
+                    : cases.filter((c) => c.status === opt.value).length;
+              return (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label} ({count})
+                </option>
+              );
+            })}
+          </Select>
+        </div>
+      )}
 
       {/* Table */}
       <DataTable
