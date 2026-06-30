@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
-import { FolderOpen, Layers, ArrowDown } from 'lucide-react';
+import { useMemo, useId } from 'react';
+import { FolderOpen, Layers, ArrowDown, Info } from 'lucide-react';
 import { CaseRecord, ServiceCategory } from '@/lib/types';
 import { getPipelineStage, PIPELINE_STAGES, PipelineStageKey } from '@/constants/case-status';
 import { StatusBarChart, StatusDatum } from './status-bar-chart';
@@ -59,10 +59,33 @@ export function PipelineReport({ cases }: PipelineReportProps) {
     return PIPELINE_STAGES.map((s) => ({ stage: s.key, count: counts.get(s.key) ?? 0 }));
   }, [activeCases]);
 
+  // B.3.3 (F-HIGH-32): unique id for the pipeline info-tooltip so screen readers
+  // and the native `title` attribute can both describe what "Bill / doanh thu
+  // tiềm năng" actually means here.
+  const pipelineInfoId = useId();
+
   return (
     <div className="space-y-6">
-      <ChartCard title="Pipeline chuyển đổi ca" icon={<ArrowDown className="h-5 w-5 text-swan-600" />} minHeight={280}>
+      <ChartCard
+        title="Pipeline chuyển đổi ca"
+        icon={<ArrowDown className="h-5 w-5 text-swan-600" />}
+        minHeight={280}
+        action={
+          <span
+            aria-describedby={pipelineInfoId}
+            title="Pipeline đếm số ca đang ở từng giai đoạn. Bill = Tổng tiền ca chưa xác nhận thanh toán (doanh thu tiềm năng)."
+            className="inline-flex items-center gap-1 rounded-full bg-swan-50 px-2 py-0.5 text-[11px] font-medium text-swan-700"
+          >
+            <Info className="h-3.5 w-3.5" aria-hidden="true" />
+            Bill = Tổng chưa xác nhận (tiềm năng)
+          </span>
+        }
+      >
         <PipelineFunnel data={funnelData} />
+        {/* B.3.3 (F-HIGH-32): hidden accessible description for the pipeline info chip. */}
+        <span id={pipelineInfoId} className="sr-only">
+          Pipeline đếm số ca đang ở từng giai đoạn. Bill = Tổng tiền ca chưa xác nhận thanh toán (doanh thu tiềm năng, không phải doanh thu thực).
+        </span>
       </ChartCard>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

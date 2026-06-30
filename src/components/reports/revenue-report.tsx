@@ -48,11 +48,14 @@ export function RevenueReport({ payments, cases, dateRange }: RevenueReportProps
   }, [filteredPayments]);
 
   // Monthly trend
+  // B.3.3 (F-HIGH-33): per-month refund tracking so the revenue chart can draw
+  // a red refund line + annotation. Refund amount is only accumulated for
+  // confirmed refund payments (matches the existing total-refund accounting).
   const monthlyData: MonthlyRevenuePoint[] = useMemo(() => {
-    const map = new Map<string, { confirmed: number; pending: number }>();
+    const map = new Map<string, { confirmed: number; pending: number; refund: number }>();
     for (const p of filteredPayments) {
       const key = getMonthKey(new Date(p.paymentDate));
-      if (!map.has(key)) map.set(key, { confirmed: 0, pending: 0 });
+      if (!map.has(key)) map.set(key, { confirmed: 0, pending: 0, refund: 0 });
       const entry = map.get(key)!;
       // Không cộng refund vào confirmed
       if (p.status === 'confirmed' && p.paymentType !== 'refund') {
@@ -60,7 +63,10 @@ export function RevenueReport({ payments, cases, dateRange }: RevenueReportProps
       } else if (p.status !== 'confirmed') {
         entry.pending += p.amount ?? 0;
       }
-      // (refund confirmed không cộng vào đâu trong chart)
+      // B.3.3: track refund separately so the chart can render the red line
+      if (p.paymentType === 'refund' && p.status === 'confirmed') {
+        entry.refund += p.amount ?? 0;
+      }
     }
     const sorted = Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
     return sorted.map(([key, val]) => ({
@@ -68,6 +74,7 @@ export function RevenueReport({ payments, cases, dateRange }: RevenueReportProps
       label: getMonthLabel(new Date(key + '-01')),
       confirmed: val.confirmed,
       pending: val.pending,
+      refund: val.refund,
     }));
   }, [filteredPayments]);
 
