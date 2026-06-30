@@ -129,13 +129,42 @@ export function buildMedicalAlertNotification(caseCode: string): {
   };
 }
 
-export function buildComplaintNotification(caseCode: string): {
-  title: string;
-  body: string;
-} {
+export function buildComplaintNotification(
+  data:
+    | string
+    | {
+        caseCode: string;
+        /**
+         * Resolved display names of the medical team assigned to the case.
+         * Only staff names — never PII fields (nationalIdNumber, medicalNote,
+         * privacyNote, address). See F-HIGH-21 / Story B.1.6.
+         */
+        staffNames?: {
+          doctor?: string;
+          nurse?: string;
+          coordinator?: string;
+        };
+      },
+): { title: string; body: string } {
+  // Backwards-compatible overload: legacy callers passed a bare `caseCode`.
+  const caseCode = typeof data === 'string' ? data : data.caseCode;
+  const staffNames = typeof data === 'string' ? undefined : data.staffNames;
+
+  const teamLines: string[] = [];
+  if (staffNames?.doctor) teamLines.push(`Bác sĩ phụ trách: ${staffNames.doctor}`);
+  if (staffNames?.nurse) teamLines.push(`Y tá phụ trách: ${staffNames.nurse}`);
+  if (staffNames?.coordinator) {
+    teamLines.push(`Điều phối viên phụ trách: ${staffNames.coordinator}`);
+  }
+
+  const body = [
+    `Ca ${caseCode} có khiếu nại từ khách hàng. Cần xử lý khẩn.`,
+    ...(teamLines.length > 0 ? ['', ...teamLines] : []),
+  ].join('\n');
+
   return {
     title: `🚨 KHIẾU NẠI — ${caseCode}`,
-    body: `Ca ${caseCode} có khiếu nại từ khách hàng. Cần xử lý khẩn.`,
+    body,
   };
 }
 

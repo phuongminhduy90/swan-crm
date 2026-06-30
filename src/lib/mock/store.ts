@@ -627,6 +627,10 @@ function seedStaffAssignments(): void {
     { id: 'sa-003', caseId: 'case-003', salesOfflineId: 'user-006', coordinatorId: 'user-010', accountantId: 'user-007', assignedBy: 'user-006', createdAt: now, updatedAt: now },
     { id: 'sa-004', caseId: 'case-004', masterSalesId: 'user-004', doctorId: 'user-008', coordinatorId: 'user-010', cskhPostopId: 'user-011', nurseIds: ['user-009'], assignedBy: 'user-004', createdAt: now, updatedAt: now },
     { id: 'sa-005', caseId: 'case-005', salesOnlineId: 'user-005', doctorId: 'user-008', cskhPostopId: 'user-011', assignedBy: 'user-005', createdAt: now, updatedAt: now },
+    // B.1.6 (F-HIGH-21): case-006 has the full medical team (doctor + nurse +
+    // coordinator) so a complaint on this case exercises the medical-team
+    // recipient path in `triggerComplaint()`.
+    { id: 'sa-006', caseId: 'case-006', masterSalesId: 'user-004', doctorId: 'user-008', coordinatorId: 'user-010', nurseIds: ['user-009'], cskhPostopId: 'user-011', accountantId: 'user-007', assignedBy: 'user-004', createdAt: now, updatedAt: now },
   ];
   for (const a of assignments) col.set(a.id, a as Record<string, unknown>);
 }

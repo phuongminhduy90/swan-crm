@@ -12,6 +12,7 @@ import {
   triggerMedicalAlert,
   triggerComplaint,
   triggerPostOpFollowupDue,
+  resolveCskhDisplayName,
 } from '@/lib/notifications/trigger';
 import { getCustomer } from '@/lib/firestore/customers';
 import { requirePermission, isErrorResponse } from '@/lib/api/auth';
@@ -123,13 +124,25 @@ export async function PATCH(
     } else if (newStatus.startsWith('post_op_')) {
       const customer = await getCustomer(existing.customerId);
       const followupDay = newStatus.replace('post_op_', 'D').toUpperCase();
+      // Story B.1.7 (F-MED-19): resolve CSKH name dynamically from staff
+      // assignment. `resolveCskhDisplayName` is self-defensive (returns the
+      // literal 'CSKH' on any lookup failure), but we still wrap the call so
+      // that a future regression in the helper cannot abort the status
+      // change response. Mirrors the existing fire-and-forget pattern for
+      // `triggerAutoTasks` and `createPostOpFollowups` above.
+      let cskhName = 'CSKH';
+      try {
+        cskhName = await resolveCskhDisplayName(existing.id);
+      } catch (err) {
+        console.error('[resolveCskhDisplayName] Unexpected rejection:', err);
+      }
       triggerPostOpFollowupDue(
         existing.caseCode,
         existing.customerId,
         existing.id,
         customer?.fullName ?? 'Khách hàng',
         followupDay,
-        'CSKH',
+        cskhName,
         user.uid,
       );
     }

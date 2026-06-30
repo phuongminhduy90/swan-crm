@@ -40,6 +40,7 @@ vi.mock('@/lib/notifications/trigger', () => ({
   triggerMedicalAlert: vi.fn(),
   triggerComplaint: vi.fn(),
   triggerPostOpFollowupDue: vi.fn(),
+  resolveCskhDisplayName: vi.fn(),
 }));
 
 vi.mock('@/lib/tasks/auto-tasks', () => ({
@@ -55,6 +56,7 @@ vi.mock('@/lib/firestore/followups', () => ({
 import { PATCH } from '@/app/api/cases/[id]/status/route';
 import { CASE_STATUS_CHANGE_ROLES } from '@/constants/permissions';
 import type { CaseRecord, UserRole } from '@/lib/types';
+import { triggerPostOpFollowupDue, resolveCskhDisplayName } from '@/lib/notifications/trigger';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -143,6 +145,11 @@ describe('PATCH /api/cases/[id]/status — Story B.1.3 (F-CRIT-05)', () => {
     mockWriteAuditLog.mockResolvedValue(undefined);
     mockGetCustomer.mockResolvedValue({ id: 'cust-001', fullName: 'Nguyễn Văn A' });
     mockCreatePostOpFollowups.mockResolvedValue(undefined);
+    // B.1.7 default: CSKH resolves to a real display name. Individual tests
+    // can override this to simulate the "no assignment" fallback path.
+    (resolveCskhDisplayName as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
+      'Phạm Ngọc Điệp',
+    );
   });
 
   afterEach(() => {
@@ -416,6 +423,139 @@ describe('PATCH /api/cases/[id]/status — Story B.1.3 (F-CRIT-05)', () => {
         params: { id: 'case-001' },
       });
       expect(res.status).toBe(400);
+    });
+  });
+
+  // ── 8. Story B.1.7 — CSKH display name resolution on post_op_* transitions
+
+  /**
+   * Story B.1.7 (F-MED-19) — Resolve CSKH name dynamically from staff
+   * assignment when sending post-op follow-up due notifications. Replaces
+   * the previous hardcoded literal `'CSKH'` passed to
+   * `triggerPostOpFollowupDue`.
+   *
+   * @see docs/ux-redesign/STORY_B1_7_IMPLEMENTATION_REPORT.md
+   */
+  describe('post-op followup — CSKH name resolution (Story B.1.7 / F-MED-19)', () => {
+    beforeEach(() => {
+      process.env.NEXT_PUBLIC_FEATURE_SERVER_RBAC = 'true';
+    });
+
+    it('passes the resolved CSKH display name (not literal "CSKH") to triggerPostOpFollowupDue', async () => {
+      (resolveCskhDisplayName as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
+        'Phạm Ngọc Điệp',
+      );
+      // Source status must allow transitioning to post_op_d3 — i.e. post_op_d1.
+      mockGetCase.mockResolvedValue(buildCase({ status: 'post_op_d1' }));
+
+      const res = await PATCH(
+        buildRequest('cso', { status: 'post_op_d3' }),
+        { params: { id: 'case-001' } },
+      );
+      expect(res.status).toBe(200);
+
+      expect(resolveCskhDisplayName).toHaveBeenCalledWith('case-001');
+      expect(triggerPostOpFollowupDue).toHaveBeenCalledTimes(1);
+      const callArgs = (triggerPostOpFollowupDue as unknown as ReturnType<typeof vi.fn>).mock
+        .calls[0] as unknown[];
+      // arg layout: (caseCode, customerId, caseId, customerName, followupDay, assigneeName, assigneeId)
+      expect(callArgs[0]).toBe('CASE-001');
+      expect(callArgs[2]).toBe('case-001');
+      // followupDay is produced by `newStatus.replace('post_op_','D').toUpperCase()`
+      // — for `post_op_d3` this yields `'DD3'` (a pre-existing quirk of the
+      // status-derived label; out of B.1.7 scope). B.1.7 only asserts on the
+      // CSKH name (index 5).
+      expect(callArgs[4]).toBe('DD3');
+      // assigneeName (index 5) must be the resolved display name, NOT 'CSKH'.
+      expect(callArgs[5]).toBe('Phạm Ngọc Điệp');
+      expect(callArgs[5]).not.toBe('CSKH');
+      expect(callArgs[6]).toBe('user-003');
+    });
+
+    it('falls back to the literal "CSKH" string when resolveCskhDisplayName returns the fallback', async () => {
+      // Mirrors the production behavior when no staff assignment exists —
+      // resolveCskhDisplayName returns the literal 'CSKH' string, which the
+      // route must propagate unchanged.
+      (resolveCskhDisplayName as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
+        'CSKH',
+      );
+      mockGetCase.mockResolvedValue(buildCase({ status: 'post_op_d3' }));
+
+      const res = await PATCH(
+        buildRequest('cso', { status: 'post_op_d7' }),
+        { params: { id: 'case-001' } },
+      );
+      expect(res.status).toBe(200);
+
+      const callArgs = (triggerPostOpFollowupDue as unknown as ReturnType<typeof vi.fn>).mock
+        .calls[0] as unknown[];
+      expect(callArgs[5]).toBe('CSKH');
+    });
+
+    it('does NOT throw the route when resolveCskhDisplayName rejects (defensive)', async () => {
+      // resolveCskhDisplayName itself is supposed to swallow errors and
+      // return the fallback, but if a future regression lets one escape,
+      // the route must still respond 200 (the status change already
+      // succeeded).
+      (resolveCskhDisplayName as unknown as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error('lookup blew up'),
+      );
+      mockGetCase.mockResolvedValue(buildCase({ status: 'procedure_completed' }));
+
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      const res = await PATCH(
+        buildRequest('cso', { status: 'post_op_d1' }),
+        { params: { id: 'case-001' } },
+      );
+
+      // Status change itself succeeded.
+      expect(res.status).toBe(200);
+      expect(mockUpdateCaseStatus).toHaveBeenCalled();
+      expect(errorSpy).toHaveBeenCalled();
+      errorSpy.mockRestore();
+    });
+
+    it('does not call resolveCskhDisplayName for non-post-op transitions', async () => {
+      // resolveCskhDisplayName must only be consulted for post_op_* statuses
+      // — not for medical_alert, complaint, draft, etc.
+      const res = await PATCH(
+        buildRequest('cso', { status: 'waiting_payment_confirmation' }),
+        { params: { id: 'case-001' } },
+      );
+      expect(res.status).toBe(200);
+      expect(resolveCskhDisplayName).not.toHaveBeenCalled();
+    });
+
+    it('resolves CSKH for every post_op_* day variant (D1/D3/D7/D14/D30/D90)', async () => {
+      // Each post_op_* status requires its predecessor as the source case status
+      // (per CASE_STATUS_TRANSITIONS): d1←procedure_completed, d3←d1, d7←d3, …
+      // followupDay is computed via `newStatus.replace('post_op_','D').toUpperCase()`
+      // — a pre-existing label format quirk producing 'DD1', 'DD3', etc. B.1.7
+      // only asserts on the CSKH display name (assigneeName, index 5).
+      const days: Array<{ from: string; to: string; label: string }> = [
+        { from: 'procedure_completed', to: 'post_op_d1', label: 'DD1' },
+        { from: 'post_op_d1', to: 'post_op_d3', label: 'DD3' },
+        { from: 'post_op_d3', to: 'post_op_d7', label: 'DD7' },
+        { from: 'post_op_d7', to: 'post_op_d14', label: 'DD14' },
+        { from: 'post_op_d14', to: 'post_op_d30', label: 'DD30' },
+        { from: 'post_op_d30', to: 'post_op_d90', label: 'DD90' },
+      ];
+
+      for (const { from, to, label } of days) {
+        mockGetCase.mockResolvedValue(buildCase({ status: from as CaseRecord['status'] }));
+        (resolveCskhDisplayName as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
+          'Phạm Ngọc Điệp',
+        );
+        const res = await PATCH(buildRequest('cso', { status: to }), {
+          params: { id: 'case-001' },
+        });
+        expect(res.status).toBe(200);
+        const callArgs = (triggerPostOpFollowupDue as unknown as ReturnType<typeof vi.fn>).mock
+          .calls.slice(-1)[0] as unknown[];
+        expect(callArgs[5]).toBe('Phạm Ngọc Điệp');
+        expect(callArgs[4]).toBe(label);
+      }
     });
   });
 });
