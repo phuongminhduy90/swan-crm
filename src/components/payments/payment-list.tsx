@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { CheckCircle, XCircle, Clock, RefreshCw } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, RefreshCw, ShieldAlert } from 'lucide-react';
 import { Payment } from '@/lib/types';
 import { getAllPayments, getPaymentsByCase, confirmPayment, rejectPayment } from '@/lib/firestore';
 import { useAuth } from '@/lib/auth/AuthProvider';
@@ -10,6 +10,8 @@ import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PaymentConfirmDialog } from './payment-confirm-dialog';
+import { PAYMENT_CONFIRM_ROLES } from '@/constants/permissions';
+import { isFlagEnabled } from '@/lib/feature-flags';
 
 const PAYMENT_TYPE_LABELS: Record<string, string> = {
   deposit: 'Đặt cọc',
@@ -40,8 +42,19 @@ export function PaymentList({ caseId, statusFilter, paymentTypeFilter, refresh }
   const [error, setError] = useState<string | null>(null);
   const [confirmingPayment, setConfirmingPayment] = useState<Payment | null>(null);
 
+  // Story B.3.1 (F-CRIT-06): read the role allow-list from the static
+  // contract instead of hardcoding `'accountant' || 'admin'`. The previous
+  // hardcoded list silently drifted from `PAYMENT_CONFIRM_ROLES` whenever
+  // that constant changed. SoD is enforced server-side; this is purely
+  // UI hiding per anti-pattern A6 (DESIGN_DIRECTION §18).
   const canApprove =
-    userProfile?.role === 'accountant' || userProfile?.role === 'admin';
+    userProfile?.role !== undefined &&
+    PAYMENT_CONFIRM_ROLES.includes(userProfile.role);
+
+  // Story B.3.1 (F-CRIT-06): when the SoD flag is on, suppress the action
+  // button for rows the current user created. The server returns 403 in
+  // that case anyway, but hiding it improves UX (no rejected click).
+  const sodEnabled = isFlagEnabled('PAYMENT_SOD');
 
   const load = useCallback(async () => {
     try {
@@ -150,8 +163,27 @@ export function PaymentList({ caseId, statusFilter, paymentTypeFilter, refresh }
           {
             key: 'actions',
             header: 'Thao tác',
-            render: (row: Payment) =>
-              row.status === 'pending' ? (
+            render: (row: Payment) => {
+              if (row.status !== 'pending') {
+                return <span className="text-xs text-gray-400">—</span>;
+              }
+              // Story B.3.1: hide the action button for payments the
+              // current user created when SoD is enforced — the server
+              // would 403 anyway.
+              const isOwnPayment =
+                sodEnabled && row.createdBy === userProfile?.id;
+              if (isOwnPayment) {
+                return (
+                  <span
+                    className="inline-flex items-center gap-1 text-xs text-amber-700"
+                    title="Bạn đã tạo thanh toán này — cần admin khác xác nhận (SoD)."
+                  >
+                    <ShieldAlert className="h-3 w-3" />
+                    SoD
+                  </span>
+                );
+              }
+              return (
                 <Button
                   size="sm"
                   variant="outline"
@@ -162,9 +194,8 @@ export function PaymentList({ caseId, statusFilter, paymentTypeFilter, refresh }
                 >
                   Xử lý
                 </Button>
-              ) : (
-                <span className="text-xs text-gray-400">—</span>
-              ),
+              );
+            },
           },
         ]
       : []),

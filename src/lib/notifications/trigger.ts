@@ -216,6 +216,24 @@ export function triggerMedicalAlert(caseRecord: CaseRecord): void {
   }
 }
 
+/**
+ * Story B.2.2 (F-HIGH-19) — Fire-and-forget: notify the medical team
+ * (doctor + cso + admin) when a medical alert is resolved.
+ */
+export function triggerMedicalAlertResolved(caseRecord: CaseRecord): void {
+  try {
+    void sendInAppNotification({
+      eventType: 'medical_alert_resolved',
+      title: `✅ CẢNH BÁO CHUYÊN MÔN ĐÃ XỬ LÝ — ${caseRecord.caseCode}`,
+      body: `Ca ${caseRecord.caseCode} đã được xử lý cảnh báo chuyên môn.`,
+      caseId: caseRecord.id,
+      recipientRoles: ['doctor', 'cso', 'admin'],
+    });
+  } catch (err) {
+    console.error('[triggerMedicalAlertResolved] Failed:', err);
+  }
+}
+
 export function triggerComplaint(caseRecord: CaseRecord): void {
   // Fire-and-forget: resolve medical team from staff assignment, then send.
   // We keep the outer function sync (callers do `triggerComplaint(existing)`)

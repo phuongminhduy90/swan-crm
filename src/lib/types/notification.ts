@@ -14,7 +14,8 @@ export type NotificationEventType =
   | 'images_missing'
   | 'postop_followup_due'
   | 'complaint'
-  | 'medical_alert';
+  | 'medical_alert'
+  | 'medical_alert_resolved';
 
 export type NotificationChannel = 'in_app' | 'telegram' | 'zalo_placeholder';
 export type NotificationStatus = 'pending' | 'sent' | 'failed';

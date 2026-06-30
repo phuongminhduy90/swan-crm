@@ -38,6 +38,7 @@ vi.mock('@/lib/firestore/customers', () => ({
 
 vi.mock('@/lib/notifications/trigger', () => ({
   triggerMedicalAlert: vi.fn(),
+  triggerMedicalAlertResolved: vi.fn(),
   triggerComplaint: vi.fn(),
   triggerPostOpFollowupDue: vi.fn(),
   resolveCskhDisplayName: vi.fn(),
@@ -56,7 +57,11 @@ vi.mock('@/lib/firestore/followups', () => ({
 import { PATCH } from '@/app/api/cases/[id]/status/route';
 import { CASE_STATUS_CHANGE_ROLES } from '@/constants/permissions';
 import type { CaseRecord, UserRole } from '@/lib/types';
-import { triggerPostOpFollowupDue, resolveCskhDisplayName } from '@/lib/notifications/trigger';
+import {
+  triggerPostOpFollowupDue,
+  resolveCskhDisplayName,
+  triggerMedicalAlertResolved,
+} from '@/lib/notifications/trigger';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -557,5 +562,85 @@ describe('PATCH /api/cases/[id]/status — Story B.1.3 (F-CRIT-05)', () => {
         expect(callArgs[4]).toBe(label);
       }
     });
+  });
+});
+
+/**
+ * Story B.2.2 (F-HIGH-19) — `medical_alert_resolved` terminal status + transitions.
+ *
+ * Acceptance criteria:
+ *   - `medical_alert` CAN transition to `medical_alert_resolved`
+ *   - `medical_alert` CANNOT transition to `procedure_completed` (removed)
+ *   - `medical_alert_resolved` is terminal (no outgoing transitions)
+ *   - `triggerMedicalAlertResolved` is fired on successful transition
+ */
+describe('medical_alert_resolved — Story B.2.2 (F-HIGH-19)', () => {
+  const ORIGINAL_ENV = process.env;
+
+  beforeEach(() => {
+    process.env = { ...ORIGINAL_ENV };
+    vi.clearAllMocks();
+    mockGetCase.mockResolvedValue(buildCase({ status: 'medical_alert' }));
+    mockUpdateCaseStatus.mockResolvedValue(undefined);
+    mockWriteAuditLog.mockResolvedValue(undefined);
+    mockGetCustomer.mockResolvedValue({ id: 'cust-001', fullName: 'Khách hàng A' });
+    mockCreatePostOpFollowups.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    process.env = ORIGINAL_ENV;
+  });
+
+  it('allows medical_alert → medical_alert_resolved (200)', async () => {
+    const res = await PATCH(
+      buildRequest('cso', { status: 'medical_alert_resolved' }),
+      { params: { id: 'case-001' } },
+    );
+    expect(res.status).toBe(200);
+    expect(mockUpdateCaseStatus).toHaveBeenCalledWith(
+      'case-001',
+      'medical_alert_resolved',
+      'user-003',
+    );
+    expect(mockWriteAuditLog).toHaveBeenCalled();
+  });
+
+  it('rejects medical_alert → procedure_completed (400)', async () => {
+    const res = await PATCH(
+      buildRequest('cso', { status: 'procedure_completed' }),
+      { params: { id: 'case-001' } },
+    );
+    expect(res.status).toBe(400);
+    const json = (await res.json()) as { error: string };
+    expect(json.error).toMatch(/procedure_completed/);
+    expect(mockUpdateCaseStatus).not.toHaveBeenCalled();
+  });
+
+  it('fires triggerMedicalAlertResolved on successful medical_alert → medical_alert_resolved', async () => {
+    await PATCH(
+      buildRequest('cso', { status: 'medical_alert_resolved' }),
+      { params: { id: 'case-001' } },
+    );
+    expect(triggerMedicalAlertResolved).toHaveBeenCalledOnce();
+  });
+
+  it('does NOT fire triggerMedicalAlert when transitioning to medical_alert_resolved', async () => {
+    const { triggerMedicalAlert: mockTriggerAlert } = await import('@/lib/notifications/trigger');
+    await PATCH(
+      buildRequest('cso', { status: 'medical_alert_resolved' }),
+      { params: { id: 'case-001' } },
+    );
+    expect(mockTriggerAlert).not.toHaveBeenCalled();
+  });
+
+  it('medical_alert_resolved is terminal: no outgoing transitions from it', async () => {
+    mockGetCase.mockResolvedValue(buildCase({ status: 'medical_alert_resolved' }));
+    // Attempting to transition FROM medical_alert_resolved to anything should fail
+    const res = await PATCH(
+      buildRequest('cso', { status: 'completed' }),
+      { params: { id: 'case-001' } },
+    );
+    expect(res.status).toBe(400);
+    expect(mockUpdateCaseStatus).not.toHaveBeenCalled();
   });
 });

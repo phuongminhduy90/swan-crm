@@ -61,9 +61,12 @@ export const CHANGE_VISIBILITY_ROLES: UserRole[] = [
 ];
 
 // Which roles can confirm payments
+// Story B.3.1 (F-CRIT-06) — Accountant removed. Only `admin` can confirm
+// payments, and even admin cannot confirm a payment they created (SoD).
+// The SoD guard lives in /api/payments/[id]/confirm and is gated behind the
+// `NEXT_PUBLIC_FEATURE_PAYMENT_SOD` flag (default OFF in production).
 export const PAYMENT_CONFIRM_ROLES: UserRole[] = [
   'admin',
-  'accountant',
 ];
 
 // Which roles can create payments

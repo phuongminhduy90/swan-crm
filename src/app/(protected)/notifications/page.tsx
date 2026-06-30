@@ -31,6 +31,7 @@ const EVENT_ICONS: Record<NotificationEventType, React.ElementType> = {
   postop_followup_due: Activity,
   complaint: MessageCircle,
   medical_alert: AlertCircle,
+  medical_alert_resolved: CheckCircle2,
 };
 
 function relativeTime(iso: string): string {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CASE_STATUS_TRANSITIONS } from '@/constants/case-status';
+import { CASE_STATUS_TRANSITIONS, TERMINAL_STATUSES } from '@/constants/case-status';
 import { CASE_STATUS_CHANGE_ROLES } from '@/constants/permissions';
 import type { CaseStatus, UserRole } from '@/lib/types';
 
@@ -71,11 +71,14 @@ describe("CASE_STATUS_TRANSITIONS — Story B.1.2 (F-CRIT-04)", () => {
     });
 
     it("'medical_alert' transitions are unchanged (B.2.2 owns those)", () => {
-      expect(CASE_STATUS_TRANSITIONS.medical_alert).toEqual([
-        'procedure_completed',
-        'complaint',
-        'completed',
-      ]);
+      // B.2.2 (F-HIGH-19) replaces this matrix — see the dedicated B.2.2
+      // describe block below. We keep this legacy assertion loose (does-not-
+      // include `'procedure_completed'`) rather than asserting the exact
+      // matrix so that this B.1.2 regression test stays in scope after
+      // B.2.2 lands.
+      const medicalAlertTransitions = (CASE_STATUS_TRANSITIONS['medical_alert'] ??
+        []) as CaseStatus[];
+      expect(medicalAlertTransitions).not.toContain('procedure_completed');
     });
 
     it("'scheduled' outgoing transitions remain in place", () => {
@@ -84,6 +87,82 @@ describe("CASE_STATUS_TRANSITIONS — Story B.1.2 (F-CRIT-04)", () => {
         'postponed',
         'cancelled',
       ]);
+    });
+  });
+});
+
+/**
+ * Story B.2.2 — `medical_alert_resolved` terminal status + transitions.
+ * ID: F-HIGH-19 | Sprint: 6.1 | Owner: FE-1
+ *
+ * Background: previously `medical_alert` could transition to
+ * `procedure_completed` (a back-door skip past medical clearance). After
+ * B.2.2, the only forward resolution paths from `medical_alert` are:
+ *   - `medical_alert_resolved` (new — successful resolution, terminal)
+ *   - `complaint` (escalation to complaint workflow)
+ *   - `completed` (administrative closure)
+ *
+ * `procedure_completed` is intentionally NO LONGER reachable from
+ * `medical_alert`. Cases must be re-routed through `medical_alert_resolved`
+ * (or `complaint` → `completed`) instead.
+ */
+describe("CASE_STATUS_TRANSITIONS — Story B.2.2 (F-HIGH-19)", () => {
+  describe("medical_alert allowed transitions", () => {
+    const allowed = (CASE_STATUS_TRANSITIONS['medical_alert'] ?? []) as CaseStatus[];
+
+    it("includes 'medical_alert_resolved' (new resolution path)", () => {
+      expect(allowed).toContain('medical_alert_resolved');
+    });
+
+    it("does NOT include 'procedure_completed' (back-door skip removed)", () => {
+      expect(allowed).not.toContain('procedure_completed');
+    });
+
+    it("still includes 'complaint' (escalation)", () => {
+      expect(allowed).toContain('complaint');
+    });
+
+    it("still includes 'completed' (administrative closure)", () => {
+      expect(allowed).toContain('completed');
+    });
+
+    it("has exactly the three documented forward transitions", () => {
+      expect(allowed).toEqual([
+        'medical_alert_resolved',
+        'complaint',
+        'completed',
+      ]);
+    });
+  });
+
+  describe("medical_alert_resolved is a terminal status", () => {
+    const outgoing = CASE_STATUS_TRANSITIONS['medical_alert_resolved'];
+
+    it("is defined in CASE_STATUS_TRANSITIONS", () => {
+      expect(outgoing).toBeDefined();
+    });
+
+    it("has zero outgoing transitions", () => {
+      expect(outgoing).toEqual([]);
+    });
+
+    it("does NOT allow medical_alert_resolved → procedure_completed", () => {
+      expect(outgoing).not.toContain('procedure_completed');
+    });
+
+    it("does NOT allow medical_alert_resolved → completed", () => {
+      // Terminal means truly terminal — no further forward motion.
+      expect(outgoing).not.toContain('completed');
+    });
+
+    it("does NOT allow medical_alert_resolved → medical_alert (no resurrection)", () => {
+      expect(outgoing).not.toContain('medical_alert');
+    });
+  });
+
+  describe("TERMINAL_STATUSES coverage", () => {
+    it("includes 'medical_alert_resolved'", () => {
+      expect(TERMINAL_STATUSES).toContain('medical_alert_resolved');
     });
   });
 });
@@ -153,12 +232,12 @@ describe("CASE_STATUS_CHANGE_ROLES — Story B.1.3 (F-CRIT-05)", () => {
       expect(allowed).toContain('waiting_images_upload');
     });
 
-    it("'medical_alert' can transition to procedure_completed, complaint, or completed", () => {
+    it("'medical_alert' can transition to medical_alert_resolved, complaint, or completed (B.2.2)", () => {
       // This matrix is owned by B.2.2 (F-HIGH-19). B.1.3 does not modify it
       // but reads it; pin the contract so the B.1.3 RBAC guard doesn't
       // accidentally mask a future regression here.
       expect(CASE_STATUS_TRANSITIONS.medical_alert).toEqual([
-        'procedure_completed',
+        'medical_alert_resolved',
         'complaint',
         'completed',
       ]);

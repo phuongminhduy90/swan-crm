@@ -66,7 +66,7 @@ function parseStatusParam(raw: string | null): StatusFilterValue {
     'in_procedure', 'procedure_completed', 'waiting_images_upload',
     'post_op_d1', 'post_op_d3', 'post_op_d7',
     'post_op_d14', 'post_op_d30', 'post_op_d90',
-    'completed', 'postponed', 'cancelled', 'complaint', 'medical_alert',
+    'completed', 'postponed', 'cancelled', 'complaint', 'medical_alert', 'medical_alert_resolved',
   ];
   return known.includes(raw as StatusFilterValue) ? (raw as StatusFilterValue) : 'all';
 }

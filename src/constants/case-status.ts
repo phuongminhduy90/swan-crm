@@ -29,6 +29,7 @@ export const CASE_STATUS_LABELS: Record<CaseStatus, string> = {
   cancelled: 'Hủy ca',
   complaint: 'Khiếu nại',
   medical_alert: 'Cảnh báo chuyên môn',
+  medical_alert_resolved: 'Đã xử lý cảnh báo',
 };
 
 export const CASE_STATUS_COLORS: Record<CaseStatus, string> = {
@@ -60,6 +61,7 @@ export const CASE_STATUS_COLORS: Record<CaseStatus, string> = {
   cancelled: 'bg-red-100 text-red-700 border-red-200',
   complaint: 'bg-red-200 text-red-800 border-red-300',
   medical_alert: 'bg-orange-200 text-orange-900 border-orange-300',
+  medical_alert_resolved: 'bg-emerald-100 text-emerald-800 border-emerald-300',
 };
 
 // Allowed forward transitions per status
@@ -90,7 +92,8 @@ export const CASE_STATUS_TRANSITIONS: Partial<Record<CaseStatus, CaseStatus[]>> 
   post_op_d14: ['post_op_d30', 'completed', 'medical_alert', 'complaint'],
   post_op_d30: ['post_op_d90', 'completed', 'medical_alert', 'complaint'],
   post_op_d90: ['completed', 'medical_alert', 'complaint'],
-  medical_alert: ['procedure_completed', 'complaint', 'completed'],
+  medical_alert: ['medical_alert_resolved', 'complaint', 'completed'],
+  medical_alert_resolved: [],
   complaint: ['completed'],
 };
 
@@ -103,7 +106,7 @@ export const POST_OP_STATUSES: CaseStatus[] = [
   'post_op_d90',
 ];
 
-export const TERMINAL_STATUSES: CaseStatus[] = ['completed', 'cancelled'];
+export const TERMINAL_STATUSES: CaseStatus[] = ['completed', 'cancelled', 'medical_alert_resolved'];
 
 // Hex colors for chart visualizations (Recharts doesn't accept Tailwind classes)
 export const CASE_STATUS_HEX: Record<CaseStatus, string> = {
@@ -135,6 +138,7 @@ export const CASE_STATUS_HEX: Record<CaseStatus, string> = {
   cancelled: '#EF4444',
   complaint: '#DC2626',
   medical_alert: '#EA580C',
+  medical_alert_resolved: '#10B981',
 };
 
 // Pipeline funnel — high-level status groups used in pipeline chart
@@ -173,5 +177,5 @@ export function getPipelineStage(status: CaseStatus): PipelineStageKey | null {
     return 'in_procedure';
   }
   if (POST_OP_STATUSES.includes(status)) return 'post_op';
-  return null; // completed/cancelled/postponed/complaint/medical_alert
+  return null; // completed/cancelled/postponed/complaint/medical_alert/medical_alert_resolved
 }

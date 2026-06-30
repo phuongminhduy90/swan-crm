@@ -6,7 +6,7 @@ import Link from 'next/link';
 import {
   Menu, LogOut, User as UserIcon, ChevronDown, Bell, BellRing,
   CheckCheck, Loader2, AlertCircle, DollarSign, Calendar, FileText,
-  Image as ImageIcon, Activity, Stethoscope, MessageCircle,
+  Image as ImageIcon, Activity, Stethoscope, MessageCircle, CheckCircle2,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/AuthProvider';
 import { Avatar } from '@/components/ui/avatar';
@@ -36,6 +36,7 @@ const EVENT_ICONS: Record<NotificationEventType, React.ElementType> = {
   postop_followup_due: Activity,
   complaint: MessageCircle,
   medical_alert: AlertCircle,
+  medical_alert_resolved: CheckCircle2,
 };
 
 function relativeTime(iso: string): string {

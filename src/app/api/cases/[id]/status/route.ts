@@ -10,6 +10,7 @@ import { CaseStatus } from '@/lib/types';
 import { writeAuditLog } from '@/lib/firestore/audit';
 import {
   triggerMedicalAlert,
+  triggerMedicalAlertResolved,
   triggerComplaint,
   triggerPostOpFollowupDue,
   resolveCskhDisplayName,
@@ -119,6 +120,11 @@ export async function PATCH(
     // Fire-and-forget: status-dependent notifications
     if (newStatus === 'medical_alert') {
       triggerMedicalAlert(existing);
+    } else if (newStatus === 'medical_alert_resolved') {
+      // Story B.2.2 (F-HIGH-19): notify the medical team that the alert has
+      // been resolved. Same recipient set as `triggerMedicalAlert` so the
+      // doctor + CSO + admin see both ends of the alert lifecycle.
+      triggerMedicalAlertResolved(existing);
     } else if (newStatus === 'complaint') {
       triggerComplaint(existing);
     } else if (newStatus.startsWith('post_op_')) {

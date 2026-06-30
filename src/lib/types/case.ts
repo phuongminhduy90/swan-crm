@@ -37,7 +37,8 @@ export type CaseStatus =
   | 'postponed'
   | 'cancelled'
   | 'complaint'
-  | 'medical_alert';
+  | 'medical_alert'
+  | 'medical_alert_resolved';
 
 export type PaymentStatus = 'unpaid' | 'deposit' | 'partial' | 'paid' | 'refunded';
 export type CasePriority = 'normal' | 'high' | 'urgent';
