@@ -145,6 +145,10 @@ export default function CaseDetailPage() {
     totalCount: number;
   } | null>(null);
 
+  // Story B.2.1 — failed clinical checklist keys, surfaced in the
+  // StatusWorkflow red banner so the user sees WHICH items are missing.
+  const [failedChecklistKeys, setFailedChecklistKeys] = useState<string[]>([]);
+
   const canWrite = !!user && hasPermission(user.role, 'cases:write');
   const canStatusChange = !!user && CASE_STATUS_CHANGE_ROLES.includes(user.role);
   const canPaymentCreate = !!user && PAYMENT_CREATE_ROLES.includes(user.role);
@@ -192,12 +196,17 @@ export default function CaseDetailPage() {
     let cancelled = false;
     if (!caseId || !caseRecord) {
       setChecklistSummary(null);
+      setFailedChecklistKeys([]);
       return;
     }
     (async () => {
       try {
-        const { evaluatePreProcedureChecklist } = await import('@/lib/checklist');
-        const result = await evaluatePreProcedureChecklist(caseId);
+        // Story B.2.1 — switch from the legacy 6-item evaluator to the
+        // 12-item clinical evaluator so the gate math matches what the
+        // server enforces. The legacy evaluator is still exported for the
+        // pre-hospital panel.
+        const { evaluateClinicalChecklist } = await import('@/lib/checklist');
+        const result = await evaluateClinicalChecklist(caseId);
         if (cancelled) return;
         const required = result.items.filter((i) => i.required);
         setChecklistSummary({
@@ -205,9 +214,13 @@ export default function CaseDetailPage() {
           passedCount: required.filter((i) => i.passed).length,
           totalCount: required.length,
         });
+        setFailedChecklistKeys(result.failedKeys);
       } catch (err) {
         console.error('[CaseDetail] Checklist summary load failed:', err);
-        if (!cancelled) setChecklistSummary(null);
+        if (!cancelled) {
+          setChecklistSummary(null);
+          setFailedChecklistKeys([]);
+        }
       }
     })();
     return () => { cancelled = true; };
@@ -450,11 +463,33 @@ export default function CaseDetailPage() {
                 currentStatus={caseRecord.status}
                 initialProcedureDate={caseRecord.actualProcedureDate}
                 checklistSummary={checklistSummary ?? undefined}
+                failedChecklistKeys={failedChecklistKeys}
                 sideEffectSummary={{
                   followupsCount: 6,
                   tasksDescription: 'Các task follow-up theo dòng trạng thái (CSKH, chụp ảnh, v.v.)',
                 }}
                 onTransition={async (newStatus, extra) => {
+                  // Story B.2.1 (F-CRIT-10) — Client-side pre-flight gate
+                  // (L2 of the defense-in-depth stack). Even if the UI
+                  // button is bypassed (DevTools, stale React state,
+                  // keyboard shortcut), re-check the gate here BEFORE the
+                  // mutation so the user gets an immediate error instead of
+                  // a stale write.
+                  if (
+                    checklistSummary &&
+                    !checklistSummary.allPassed
+                  ) {
+                    const { isGatedTransition } = await import('@/lib/checklist');
+                    if (isGatedTransition(newStatus)) {
+                      const missing = failedChecklistKeys.join(', ') || 'một số mục lâm sàng';
+                      // eslint-disable-next-line no-alert
+                      window.alert(
+                        `Không thể chuyển trạng thái: thiếu ${missing}. Vui lòng hoàn thành checklist trước.`,
+                      );
+                      return;
+                    }
+                  }
+
                   // Story B.2.4 — when transitioning to `procedure_completed`,
                   // persist the captured `actualProcedureDate` to the case
                   // BEFORE flipping the status. This makes the date the
@@ -522,12 +557,14 @@ export default function CaseDetailPage() {
             </Card>
           )}
 
-          <Card className="lg:col-span-2">
-            <ChecklistPanel caseId={caseId} type="pre_hospital" />
-          </Card>
-          <Card className="lg:col-span-2">
-            <ChecklistPanel caseId={caseId} type="pre_procedure" />
-          </Card>
+          <div id="clinical-checklist-anchor" className="lg:col-span-2 space-y-6">
+            <Card>
+              <ChecklistPanel caseId={caseId} type="pre_hospital" />
+            </Card>
+            <Card>
+              <ChecklistPanel caseId={caseId} type="pre_procedure" />
+            </Card>
+          </div>
         </div>
       )}
 

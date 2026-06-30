@@ -7,6 +7,8 @@ import { CASE_STATUS_LABELS, CASE_STATUS_COLORS, CASE_STATUS_TRANSITIONS } from 
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
+import { isFlagEnabled } from '@/lib/feature-flags';
+import { isGatedTransition } from '@/lib/checklist';
 import { cn } from '@/lib/utils/cn';
 
 /**
@@ -54,6 +56,18 @@ interface Props {
    * Story B.2.4 — summary of side-effects surfaced after the transition.
    */
   sideEffectSummary?: ProcedureSideEffectSummary;
+  /**
+   * Story B.2.1 — names of pre-procedure checklist keys that currently fail
+   * (used to render the red banner copy). When omitted, the banner shows
+   * the generic "thiếu một số mục" copy.
+   */
+  failedChecklistKeys?: string[];
+  /**
+   * Story B.2.1 — ref to the checklist section so the "Mở checklist" CTA
+   * can scroll the user back to the panel instead of navigating to a dead
+   * URL (anti-pattern A8).
+   */
+  checklistAnchorRef?: React.RefObject<HTMLElement>;
 }
 
 export function StatusWorkflow({
@@ -63,6 +77,8 @@ export function StatusWorkflow({
   initialProcedureDate,
   checklistSummary,
   sideEffectSummary,
+  failedChecklistKeys,
+  checklistAnchorRef,
 }: Props) {
   const [confirmTarget, setConfirmTarget] = useState<CaseStatus | null>(null);
   const [transitioningTo, setTransitioningTo] = useState<string | null>(null);
@@ -119,8 +135,72 @@ export function StatusWorkflow({
   // of the generic one.
   const isProcedureCompletion = confirmTarget === 'procedure_completed';
 
+  // Story B.2.1 — clinical checklist gate.
+  //
+  // When `FEATURE_CHECKLIST_GATE` is ON and `allPassed === false`, the
+  // buttons leading to the 3 gated transitions become disabled and a red
+  // banner appears above the action area.
+  //
+  // The same set (`GATED_TRANSITIONS` exported from `@/lib/checklist`) is
+  // consulted server-side in `PATCH /api/cases/[id]/status` so UI and
+  // server stay in sync.
+  const gateFlagOn = isFlagEnabled('CHECKLIST_GATE');
+  const allChecklistPassed = checklistSummary?.allPassed ?? true;
+  const showGateBanner = gateFlagOn && !allChecklistPassed;
+  // Whether a specific transition button should be disabled by the gate.
+  function isButtonGated(target: CaseStatus): boolean {
+    return showGateBanner && isGatedTransition(target);
+  }
+  const gateDisabledReason =
+    'Hoàn thành checklist trước khi chuyển trạng thái';
+  // The "Mở checklist" CTA uses an explicit prop ref if the page provides
+  // one, otherwise falls back to a DOM lookup on the static id
+  // `clinical-checklist-anchor` rendered by the case detail page.
+  function scrollToChecklist() {
+    if (checklistAnchorRef?.current) {
+      checklistAnchorRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    if (typeof document === 'undefined') return;
+    const el = document.getElementById('clinical-checklist-anchor');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   return (
     <div className="space-y-4">
+      {/* Story B.2.1 — red gate banner. Shown when the gate flag is on AND
+          the checklist has not all passed. Persistent (not dismissible)
+          until the checklist passes or the user navigates away. */}
+      {showGateBanner && (
+        <div
+          role="alert"
+          aria-live="polite"
+          data-testid="checklist-gate-banner"
+          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+        >
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-red-500" />
+            <div className="min-w-0 flex-1 space-y-1">
+              <p className="font-medium text-red-800">
+                Ca chưa sẵn sàng — vui lòng hoàn thành toàn bộ checklist
+                trước khi chuyển trạng thái.
+              </p>
+              {failedChecklistKeys && failedChecklistKeys.length > 0 && (
+                <p className="text-xs text-red-600">
+                  Thiếu: {failedChecklistKeys.join(', ')}.
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={scrollToChecklist}
+                className="mt-1 text-xs font-medium text-red-700 underline underline-offset-2 hover:text-red-900"
+              >
+                Mở checklist
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Current status */}
       <div className="flex items-center gap-3">
         <span className="text-sm font-medium text-gray-600">Trạng thái hiện tại:</span>
@@ -141,19 +221,25 @@ export function StatusWorkflow({
             Chuyển tiếp
           </p>
           <div className="flex flex-wrap gap-2">
-            {safeTransitions.map((s) => (
-              <Button
-                key={s}
-                variant="outline"
-                size="sm"
-                isLoading={loading || transitioningTo === s}
-                disabled={loading || !!transitioningTo}
-                onClick={() => setConfirmTarget(s)}
-                leftIcon={<ArrowRight className="h-3.5 w-3.5" />}
-              >
-                {CASE_STATUS_LABELS[s] ?? s}
-              </Button>
-            ))}
+            {safeTransitions.map((s) => {
+              const gated = isButtonGated(s);
+              return (
+                <Button
+                  key={s}
+                  variant="outline"
+                  size="sm"
+                  isLoading={loading || transitioningTo === s}
+                  disabled={loading || !!transitioningTo || gated}
+                  aria-describedby={gated ? 'checklist-gate-banner' : undefined}
+                  title={gated ? gateDisabledReason : undefined}
+                  onClick={() => setConfirmTarget(s)}
+                  leftIcon={<ArrowRight className="h-3.5 w-3.5" />}
+                  className={cn(gated && 'opacity-50 cursor-not-allowed')}
+                >
+                  {CASE_STATUS_LABELS[s] ?? s}
+                </Button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -166,19 +252,27 @@ export function StatusWorkflow({
             Hành động đặc biệt
           </p>
           <div className="flex flex-wrap gap-2">
-            {cautionTransitions.map((s) => (
-              <Button
-                key={s}
-                variant="outline"
-                size="sm"
-                isLoading={loading || transitioningTo === s}
-                disabled={loading || !!transitioningTo}
-                onClick={() => setConfirmTarget(s)}
-                className="border-amber-300 text-amber-700 hover:bg-amber-50 hover:text-amber-800"
-              >
-                {CASE_STATUS_LABELS[s] ?? s}
-              </Button>
-            ))}
+            {cautionTransitions.map((s) => {
+              const gated = isButtonGated(s);
+              return (
+                <Button
+                  key={s}
+                  variant="outline"
+                  size="sm"
+                  isLoading={loading || transitioningTo === s}
+                  disabled={loading || !!transitioningTo || gated}
+                  aria-describedby={gated ? 'checklist-gate-banner' : undefined}
+                  title={gated ? gateDisabledReason : undefined}
+                  onClick={() => setConfirmTarget(s)}
+                  className={cn(
+                    'border-amber-300 text-amber-700 hover:bg-amber-50 hover:text-amber-800',
+                    gated && 'opacity-50 cursor-not-allowed',
+                  )}
+                >
+                  {CASE_STATUS_LABELS[s] ?? s}
+                </Button>
+              );
+            })}
           </div>
         </div>
       )}

@@ -12,7 +12,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
-    "test:ui": "vitest --ui"
+    "test:ui": "vitest --ui",
+    "seed:mvp": "npx tsx scripts/seed-mvp.ts",
+    "seed:mvp:dry-run": "npx tsx scripts/seed-mvp.ts --dry-run",
+    "seed:mvp:cleanup": "npx tsx scripts/seed-mvp.ts --cleanup"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.4",

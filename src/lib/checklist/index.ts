@@ -11,6 +11,20 @@ export interface ChecklistItem {
   required: boolean;
 }
 
+// Re-export Story B.2.1 (F-CRIT-03/F-CRIT-10) clinical checklist primitives.
+export {
+  evaluateClinicalChecklist,
+  isGatedTransition,
+  isChecklistValuePassed,
+  GATED_TRANSITIONS,
+  CLINICAL_ITEM_KEYS,
+  CLINICAL_ITEM_LABELS,
+} from './evaluatePreProcedureChecklist';
+export type {
+  ClinicalChecklistItem,
+  ClinicalChecklistResult,
+} from './evaluatePreProcedureChecklist';
+
 export async function evaluatePreHospitalChecklist(
   caseId: string,
 ): Promise<{ items: ChecklistItem[]; allPassed: boolean }> {

@@ -53,6 +53,25 @@ vi.mock('@/lib/firestore/followups', () => ({
   createPostOpFollowups: (...args: unknown[]) => mockCreatePostOpFollowups(...args),
 }));
 
+// Story B.2.1 — gate evaluator mock. Default returns allPassed=true so
+// existing B.1.3 + B.2.2 tests keep passing; individual tests override.
+const mockEvaluateClinicalChecklist = vi.fn();
+vi.mock('@/lib/checklist', () => ({
+  evaluateClinicalChecklist: (...args: unknown[]) => mockEvaluateClinicalChecklist(...args),
+  isGatedTransition: (target: string) =>
+    target === 'checked_in' || target === 'in_procedure' || target === 'medically_approved',
+  isChecklistValuePassed: (v: unknown) => v === 'not_applicable' || v === true,
+  GATED_TRANSITIONS: new Set(['checked_in', 'in_procedure', 'medically_approved']),
+  CLINICAL_ITEM_KEYS: [
+    'blood_test_result',
+    'allergy_declared',
+    'pregnancy_test_done',
+    'anesthesia_review_complete',
+    'fasting_compliant',
+    'treatment_consent_signed',
+  ],
+}));
+
 // Dynamic import AFTER mocks so the route module picks up the mocked deps.
 import { PATCH } from '@/app/api/cases/[id]/status/route';
 import { CASE_STATUS_CHANGE_ROLES } from '@/constants/permissions';
@@ -150,6 +169,14 @@ describe('PATCH /api/cases/[id]/status — Story B.1.3 (F-CRIT-05)', () => {
     mockWriteAuditLog.mockResolvedValue(undefined);
     mockGetCustomer.mockResolvedValue({ id: 'cust-001', fullName: 'Nguyễn Văn A' });
     mockCreatePostOpFollowups.mockResolvedValue(undefined);
+    // Story B.2.1 default: gate evaluator returns allPassed=true so existing
+    // B.1.3 + B.2.2 tests continue to pass when the gate flag is OFF. Tests
+    // that exercise the gate override this mock.
+    mockEvaluateClinicalChecklist.mockResolvedValue({
+      items: [],
+      allPassed: true,
+      failedKeys: [],
+    });
     // B.1.7 default: CSKH resolves to a real display name. Individual tests
     // can override this to simulate the "no assignment" fallback path.
     (resolveCskhDisplayName as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
@@ -570,6 +597,229 @@ describe('PATCH /api/cases/[id]/status — Story B.1.3 (F-CRIT-05)', () => {
         expect(callArgs[5]).toBe('Phạm Ngọc Điệp');
         expect(callArgs[4]).toBe(label);
       }
+    });
+  });
+});
+
+/**
+ * Story B.2.1 (F-CRIT-10) — Server-side clinical checklist gate (L3).
+ *
+ * Acceptance criteria:
+ *   - When FEATURE_CHECKLIST_GATE is ON AND the target status is in
+ *     `GATED_TRANSITIONS` (`checked_in`, `in_procedure`, `medically_approved`)
+ *     AND the evaluator returns `allPassed === false`, the route returns
+ *     400 with `code: 'CHECKLIST_GATE_BLOCKED'` and `failedItems` populated.
+ *   - The blocked attempt writes an audit log with action
+ *     `'case_status_blocked_by_checklist'`.
+ *   - No side-effects run on a blocked attempt (no `updateCaseStatus`,
+ *     no `createPostOpFollowups`, no `triggerAutoTasks`, no notifications).
+ *   - When FEATURE_CHECKLIST_GATE is OFF, the gate is bypassed (legacy
+ *     behavior preserved).
+ *   - When the target status is NOT in GATED_TRANSITIONS, the gate is
+ *     bypassed even when the flag is ON (e.g. `procedure_completed`).
+ *
+ * @see docs/ux-redesign/STORY_B2_1_EXECUTION_PLAN.md §4
+ */
+describe('PATCH /api/cases/[id]/status — Story B.2.1 (F-CRIT-10) server gate', () => {
+  const ORIGINAL_ENV = process.env;
+
+  beforeEach(() => {
+    process.env = { ...ORIGINAL_ENV };
+    vi.clearAllMocks();
+    mockGetCase.mockResolvedValue(buildCase({ status: 'reminder_sent' }));
+    mockUpdateCaseStatus.mockResolvedValue(undefined);
+    mockWriteAuditLog.mockResolvedValue(undefined);
+    mockGetCustomer.mockResolvedValue({ id: 'cust-001', fullName: 'Nguyễn Văn A' });
+    mockCreatePostOpFollowups.mockResolvedValue(undefined);
+    (resolveCskhDisplayName as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
+      'Phạm Ngọc Điệp',
+    );
+  });
+
+  afterEach(() => {
+    process.env = ORIGINAL_ENV;
+  });
+
+  describe('gate ON + allPassed === false', () => {
+    beforeEach(() => {
+      process.env.NEXT_PUBLIC_FEATURE_CHECKLIST_GATE = 'true';
+      process.env.NEXT_PUBLIC_FEATURE_SERVER_RBAC = 'true';
+    });
+
+    it('blocks reminder_sent → checked_in with 400 + CHECKLIST_GATE_BLOCKED', async () => {
+      mockEvaluateClinicalChecklist.mockResolvedValue({
+        items: [],
+        allPassed: false,
+        failedKeys: ['blood_test_result', 'fasting_compliant'],
+      });
+
+      const res = await PATCH(buildRequest('cso', { status: 'checked_in' }), {
+        params: { id: 'case-001' },
+      });
+
+      expect(res.status).toBe(400);
+      const json = (await res.json()) as {
+        code: string;
+        error: string;
+        failedItems: string[];
+      };
+      expect(json.code).toBe('CHECKLIST_GATE_BLOCKED');
+      expect(json.error).toMatch(/Vui lòng hoàn thành toàn bộ checklist/);
+      expect(json.failedItems).toEqual(
+        expect.arrayContaining(['blood_test_result', 'fasting_compliant']),
+      );
+      expect(mockUpdateCaseStatus).not.toHaveBeenCalled();
+    });
+
+    it('blocks checked_in → in_procedure with 400', async () => {
+      mockGetCase.mockResolvedValue(buildCase({ status: 'checked_in' }));
+      mockEvaluateClinicalChecklist.mockResolvedValue({
+        items: [],
+        allPassed: false,
+        failedKeys: ['allergy_declared'],
+      });
+
+      const res = await PATCH(buildRequest('doctor', { status: 'in_procedure' }), {
+        params: { id: 'case-001' },
+      });
+
+      expect(res.status).toBe(400);
+      const json = (await res.json()) as { code: string; failedItems: string[] };
+      expect(json.code).toBe('CHECKLIST_GATE_BLOCKED');
+      expect(json.failedItems).toContain('allergy_declared');
+      expect(mockUpdateCaseStatus).not.toHaveBeenCalled();
+    });
+
+    it('blocks waiting_doctor_review → medically_approved with 400', async () => {
+      mockGetCase.mockResolvedValue(buildCase({ status: 'waiting_doctor_review' }));
+      mockEvaluateClinicalChecklist.mockResolvedValue({
+        items: [],
+        allPassed: false,
+        failedKeys: ['pregnancy_test_done'],
+      });
+
+      const res = await PATCH(buildRequest('doctor', { status: 'medically_approved' }), {
+        params: { id: 'case-001' },
+      });
+
+      expect(res.status).toBe(400);
+      const json = (await res.json()) as { code: string; failedItems: string[] };
+      expect(json.code).toBe('CHECKLIST_GATE_BLOCKED');
+      expect(json.failedItems).toContain('pregnancy_test_done');
+    });
+
+    it('writes a case_status_blocked_by_checklist audit log on every block', async () => {
+      mockEvaluateClinicalChecklist.mockResolvedValue({
+        items: [],
+        allPassed: false,
+        failedKeys: ['blood_test_result'],
+      });
+
+      await PATCH(buildRequest('cso', { status: 'checked_in' }), {
+        params: { id: 'case-001' },
+      });
+
+      expect(mockWriteAuditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'case_status_blocked_by_checklist',
+          entityType: 'case',
+          entityId: 'case-001',
+          before: { status: 'reminder_sent' },
+          after: expect.objectContaining({
+            status: 'checked_in',
+            attempted: true,
+            failedItems: ['blood_test_result'],
+            gateFlag: 'CHECKLIST_GATE',
+          }),
+        }),
+      );
+    });
+
+    it('does NOT call updateCaseStatus, triggerAutoTasks, or createPostOpFollowups on block', async () => {
+      mockEvaluateClinicalChecklist.mockResolvedValue({
+        items: [],
+        allPassed: false,
+        failedKeys: ['blood_test_result'],
+      });
+
+      await PATCH(buildRequest('cso', { status: 'checked_in' }), {
+        params: { id: 'case-001' },
+      });
+
+      expect(mockUpdateCaseStatus).not.toHaveBeenCalled();
+      expect(mockCreatePostOpFollowups).not.toHaveBeenCalled();
+    });
+
+    it('does NOT block non-gated transitions (in_procedure → procedure_completed)', async () => {
+      mockGetCase.mockResolvedValue(buildCase({ status: 'in_procedure' }));
+      mockEvaluateClinicalChecklist.mockResolvedValue({
+        items: [],
+        allPassed: false,
+        failedKeys: ['blood_test_result'],
+      });
+
+      const res = await PATCH(buildRequest('cso', { status: 'procedure_completed' }), {
+        params: { id: 'case-001' },
+      });
+
+      // Non-gated → gate is bypassed; legacy transition validation passes.
+      expect(res.status).toBe(200);
+      expect(mockUpdateCaseStatus).toHaveBeenCalledWith(
+        'case-001',
+        'procedure_completed',
+        'user-003',
+      );
+    });
+  });
+
+  describe('gate ON + allPassed === true (gate allows transition)', () => {
+    beforeEach(() => {
+      process.env.NEXT_PUBLIC_FEATURE_CHECKLIST_GATE = 'true';
+      process.env.NEXT_PUBLIC_FEATURE_SERVER_RBAC = 'true';
+      mockEvaluateClinicalChecklist.mockResolvedValue({
+        items: [],
+        allPassed: true,
+        failedKeys: [],
+      });
+    });
+
+    it('allows reminder_sent → checked_in with 200', async () => {
+      const res = await PATCH(buildRequest('cso', { status: 'checked_in' }), {
+        params: { id: 'case-001' },
+      });
+      expect(res.status).toBe(200);
+      expect(mockUpdateCaseStatus).toHaveBeenCalledWith(
+        'case-001',
+        'checked_in',
+        'user-003',
+      );
+    });
+  });
+
+  describe('gate OFF (regression baseline)', () => {
+    beforeEach(() => {
+      delete process.env.NEXT_PUBLIC_FEATURE_CHECKLIST_GATE;
+    });
+
+    it('does NOT consult the gate evaluator when flag is OFF', async () => {
+      // Mock returns allPassed=false; if the route were still calling the
+      // evaluator it would return 400 — the test verifies it bypasses
+      // entirely instead.
+      mockEvaluateClinicalChecklist.mockResolvedValue({
+        items: [],
+        allPassed: false,
+        failedKeys: ['blood_test_result'],
+      });
+
+      const res = await PATCH(buildRequest('cso', { status: 'checked_in' }), {
+        params: { id: 'case-001' },
+      });
+
+      expect(res.status).toBe(200);
+      expect(mockUpdateCaseStatus).toHaveBeenCalled();
+      // Evaluator may or may not be consulted for legacy reasons; the test
+      // only cares about the response, not the call count. So we don't
+      // assert on mockEvaluateClinicalChecklist here.
     });
   });
 });

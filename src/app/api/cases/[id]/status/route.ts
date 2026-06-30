@@ -20,6 +20,10 @@ import { requirePermission, isErrorResponse } from '@/lib/api/auth';
 import { triggerAutoTasks } from '@/lib/tasks/auto-tasks';
 import { createPostOpFollowups } from '@/lib/firestore/followups';
 import { isFlagEnabled } from '@/lib/feature-flags';
+import {
+  evaluateClinicalChecklist,
+  isGatedTransition,
+} from '@/lib/checklist';
 
 /**
  * PATCH /api/cases/[id]/status
@@ -81,6 +85,52 @@ export async function PATCH(
         },
         { status: 400 },
       );
+    }
+
+    // Story B.2.1 (F-CRIT-10) — Server-side clinical checklist gate (L3
+    // of the defense-in-depth stack). When FEATURE_CHECKLIST_GATE is ON
+    // and the new status is one of the 3 gated transitions
+    // (`checked_in`, `in_procedure`, `medically_approved`), we re-run the
+    // pre-procedure evaluator. If any required item is missing, we block
+    // the transition with 400, audit-log the blocked attempt, and skip
+    // every side-effect (status write, followups, tasks, notifications).
+    //
+    // Anti-pattern A6 (UI-only enforcement): this server gate ensures
+    // `StatusWorkflow` is not the only enforcement. Direct API calls with
+    // a valid auth token cannot bypass it.
+    if (isFlagEnabled('CHECKLIST_GATE') && isGatedTransition(newStatus)) {
+      const evaluation = await evaluateClinicalChecklist(params.id);
+      if (!evaluation.allPassed) {
+        const failedKeys = evaluation.failedKeys;
+
+        await writeAuditLog({
+          actorId: user.uid,
+          actorName: user.displayName,
+          actorRole: user.role,
+          action: 'case_status_blocked_by_checklist',
+          entityType: 'case',
+          entityId: params.id,
+          before: { status: existing.status },
+          // Embed the failed items + gate flag into the `after` snapshot so
+          // the audit log diff renders the reason. We don't add a new
+          // metadata field to keep the audit type stable.
+          after: {
+            status: newStatus,
+            attempted: true,
+            failedItems: failedKeys,
+            gateFlag: 'CHECKLIST_GATE',
+          },
+        });
+
+        return NextResponse.json(
+          {
+            error: 'Vui lòng hoàn thành toàn bộ checklist trước khi chuyển trạng thái',
+            code: 'CHECKLIST_GATE_BLOCKED',
+            failedItems: failedKeys,
+          },
+          { status: 400 },
+        );
+      }
     }
 
     await updateCaseStatus(params.id, newStatus, user.uid);

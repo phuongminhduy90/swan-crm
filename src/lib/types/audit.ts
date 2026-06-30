@@ -15,6 +15,7 @@ export type AuditAction =
   | 'attachment_visibility_changed'
   | 'consent_created'
   | 'consent_updated'
+  | 'case_status_blocked_by_checklist'
   | 'staff_assignment_changed'
   | 'task_completed'
   | 'followup_completed'

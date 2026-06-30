@@ -92,6 +92,7 @@ const AUDIT_ACTION_LABELS: Record<AuditAction, { label: string; icon: React.Elem
   attachment_visibility_changed: { label: 'Đổi quyền xem file', icon: Shield, color: 'text-purple-600 bg-purple-50' },
   consent_created: { label: 'Tạo consent', icon: Shield, color: 'text-teal-600 bg-teal-50' },
   consent_updated: { label: 'Cập nhật consent', icon: Shield, color: 'text-teal-600 bg-teal-50' },
+  case_status_blocked_by_checklist: { label: 'Chặn đổi trạng thái do checklist', icon: AlertTriangle, color: 'text-orange-600 bg-orange-50' },
   staff_assignment_changed: { label: 'Phân công nhân sự', icon: Users, color: 'text-indigo-600 bg-indigo-50' },
   task_completed: { label: 'Hoàn thành task', icon: CheckCircle2, color: 'text-emerald-600 bg-emerald-50' },
   followup_completed: { label: 'Hoàn thành follow-up', icon: CheckCircle2, color: 'text-teal-600 bg-teal-50' },

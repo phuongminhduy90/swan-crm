@@ -1,5 +1,20 @@
 import { TreatmentLocationType } from './treatment-location';
 
+/**
+ * Story B.2.1 — Pre-procedure clinical checklist value type.
+ *
+ * Each clinical gate item can be:
+ *   - `true`   — the item is satisfied
+ *   - `false`  — the item is explicitly NOT satisfied (counts as missing)
+ *   - `'not_applicable'` — the item is irrelevant for this case (e.g. pregnancy
+ *     test for a male patient, blood test for a filler injection). The gate
+ *     treats N/A as passed.
+ *   - `undefined` — legacy/historical case predating the B.2.1 schema; the
+ *     evaluator treats this as fail-closed (counts as missing) so the gate
+ *     engages until a coordinator explicitly marks the item.
+ */
+export type ClinicalChecklistValue = boolean | 'not_applicable';
+
 export type ServiceCategory =
   | 'nose'
   | 'breast'
@@ -95,6 +110,38 @@ export interface CaseRecord {
    * "never escalated" (so the first escalation fires).
    */
   lastEscalatedAt?: string;
+
+  // ─── Story B.2.1 (F-CRIT-03 + F-CRIT-10) — Clinical checklist gates ──────
+  // Six optional fields that, together with the existing `Consent` entity,
+  // drive the pre-procedure gate (`evaluatePreProcedureChecklist`). All
+  // fields are optional for backward-compat — historical cases with
+  // `undefined` values are treated as fail-closed (gate engages until the
+  // coordinator marks them). 'not_applicable' short-circuits the gate to
+  // `passed` for items where the medical context makes the requirement moot
+  // (e.g. pregnancy test for male patients).
+
+  /** Có kết quả xét nghiệm máu (CBC / đông máu / sinh hóa). */
+  bloodTestResult?: ClinicalChecklistValue;
+
+  /** Đã khai báo dị ứng (thuốc, vật liệu, thức ăn) — true khi đã xác nhận dù là âm tính. */
+  allergyDeclared?: ClinicalChecklistValue;
+
+  /** Xét nghiệm thai cho bệnh nhân nữ trong độ tuổi sinh sản. */
+  pregnancyTestDone?: ClinicalChecklistValue;
+
+  /** Bác sĩ gây mê đã khám trước phẫu thuật (vô cảm). */
+  anesthesiaReviewComplete?: ClinicalChecklistValue;
+
+  /** Bệnh nhân nhịn ăn/uống đúng quy định trước phẫu thuật. */
+  fastingCompliant?: ClinicalChecklistValue;
+
+  /**
+   * Bệnh nhân đã ký cam kết điều trị. Derived từ Consent entity có
+   * `consentType === 'treatment'`, `consentStatus === 'granted'` và
+   * chưa bị thu hồi. Trường này là cache hint — evaluator vẫn đọc trực
+   * tiếp từ collection `consents` để tránh stale state.
+   */
+  treatmentConsentSigned?: ClinicalChecklistValue;
 }
 
 export interface CreateCaseInput {
