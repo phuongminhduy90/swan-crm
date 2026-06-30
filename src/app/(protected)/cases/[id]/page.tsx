@@ -29,11 +29,14 @@ import { PaymentList } from '@/components/payments/payment-list';
 import { PaymentForm } from '@/components/payments/payment-form';
 import { formatDateVN, formatPhone, formatCurrency } from '@/lib/utils/format';
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser';
-import { hasPermission } from '@/config/roles';
+import { hasPermission, ROLE_LABELS } from '@/config/roles';
 import {
   CASE_STATUS_CHANGE_ROLES, PAYMENT_CREATE_ROLES, MEDICAL_NOTE_ACCESS_ROLES,
 } from '@/constants/permissions';
-import { CASE_STATUS_LABELS, CASE_STATUS_TRANSITIONS } from '@/constants/case-status';
+import {
+  CASE_STATUS_LABELS, CASE_STATUS_TRANSITIONS,
+  getNextOwner, resolveNextOwnerName,
+} from '@/constants/case-status';
 import { SERVICE_CATEGORY_LABELS } from '@/constants/service-categories';
 import { addCaseServiceSchema } from '@/lib/validators/case';
 import { CreatePaymentFormValues } from '@/lib/validators/payment';
@@ -101,6 +104,11 @@ function InfoRow({ label, value, icon }: { label: string; value: React.ReactNode
     </div>
   );
 }
+
+// Story B.4.2 (F-CRIT-09) — banner is imported from a sibling file so it
+// can be tested in isolation (Next.js page files cannot export named
+// components without breaking the route type).
+import { NextOwnerBanner } from './next-owner-banner';
 
 // ─── Main page ───────────────────────────────────────────────────────────
 
@@ -363,6 +371,20 @@ export default function CaseDetailPage() {
   const privacyCfg = PRIVACY_CONFIG[caseRecord.privacyLevel];
   const activeServices = caseServices.filter((s) => s.active !== false);
 
+  // Story B.4.2 (F-CRIT-09) — derive the next-action owner for the banner.
+  // `getNextOwner` returns null only for terminal `completed`; for every
+  // other status we resolve the assigned user from `staffAssignment` and
+  // fall back to "Chưa phân công" when no one is assigned.
+  const nextOwner = getNextOwner(caseRecord.status);
+  const resolvedOwner = nextOwner
+    ? resolveNextOwnerName(
+        nextOwner,
+        staffAssignment,
+        usersMap,
+        ROLE_LABELS[nextOwner.role],
+      )
+    : null;
+
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <nav className="flex items-center gap-1.5 text-sm text-gray-500">
@@ -414,6 +436,15 @@ export default function CaseDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Story B.4.2 (F-CRIT-09) — Next-owner banner is rendered ABOVE the
+          tabs row (not inside the Info tab) so the answer to "ai phụ
+          trách?" is the first thing a clinician sees on the page, even
+          before they decide which tab to open. Hidden for the terminal
+          `completed` status since there is no next action. */}
+      {nextOwner && (
+        <NextOwnerBanner nextOwner={nextOwner} resolvedName={resolvedOwner} />
+      )}
 
       <div className="flex gap-1 rounded-xl border border-gray-200 bg-white p-1 shadow-sm">
         {TABS.map((tab) => (

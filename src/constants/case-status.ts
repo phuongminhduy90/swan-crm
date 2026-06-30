@@ -1,4 +1,5 @@
-import { CaseStatus } from '@/lib/types';
+import { CaseStatus, UserRole } from '@/lib/types';
+import type { StaffAssignment } from '@/lib/types/staff-assignment';
 
 export const CASE_STATUS_LABELS: Record<CaseStatus, string> = {
   draft: 'Nháp',
@@ -178,4 +179,285 @@ export function getPipelineStage(status: CaseStatus): PipelineStageKey | null {
   }
   if (POST_OP_STATUSES.includes(status)) return 'post_op';
   return null; // completed/cancelled/postponed/complaint/medical_alert/medical_alert_resolved
+}
+
+// ─── Next-owner banner (Story B.4.2) ────────────────────────────────────
+
+/**
+ * Banner urgency level (controls background palette):
+ *  - 'red'   — blocked / overdue / clinical-risk status. Highest visual weight.
+ *  - 'amber' — action-needed status. Clinician should act this shift.
+ *  - 'aqua'  — informational / handoff pending. Neutral.
+ */
+export type NextOwnerUrgency = 'red' | 'amber' | 'aqua';
+
+/**
+ * Which `StaffAssignment` field to read for the actual person's user ID.
+ * The page resolves the field against `staffAssignment` to display the
+ * name (or 'Chưa phân công' fallback).
+ */
+export type NextOwnerStaffField =
+  | 'masterSalesId'
+  | 'salesOnlineId'
+  | 'salesOfflineId'
+  | 'accountantId'
+  | 'doctorId'
+  | 'coordinatorId'
+  | 'cskhPostopId'
+  | 'mediaId';
+
+export interface NextOwner {
+  /** Role that owns the next action for this case status. */
+  role: UserRole;
+  /**
+   * Which `StaffAssignment` field resolves to the assigned person. `null`
+   * when the role has no single dedicated slot on the assignment form
+   * (e.g. role is `admin` / `ceo` / `cso`).
+   */
+  staffField: NextOwnerStaffField | null;
+  /** Short Vietnamese reason explaining why this role owns the next action. */
+  reason: string;
+  /** Visual urgency level — drives banner color tokens. */
+  urgency: NextOwnerUrgency;
+}
+
+/**
+ * Story B.4.2 (F-CRIT-09) — derive the next-action owner for a case status.
+ *
+ * Returns `null` for terminal / admin-only statuses (no single owning role).
+ * Otherwise returns `{ role, staffField, reason, urgency }` so the page
+ * banner can render role + name + reason + colored background without
+ * duplicating routing logic in JSX.
+ *
+ * Notes:
+ *  - All `POST_OP_STATUSES` flow to `cskh_postop` (post-op follow-up owner).
+ *  - `waiting_*` / `scheduled` / `reminder_sent` / `checked_in` /
+ *    `in_procedure` are action-needed (`amber`).
+ *  - `medical_alert` / `complaint` / `cancelled` / `medical_alert_resolved`
+ *    are clinical-risk / blocked (`red`).
+ *  - `draft` / `payment_confirmed` / `hospital_confirmed` /
+ *    `medically_approved` / `lab_test_done` / `waiting_images_upload` are
+ *    informational handoff (`aqua`).
+ */
+export function getNextOwner(status: CaseStatus): NextOwner | null {
+  switch (status) {
+    // ── Sales-owned intake / payment ──
+    case 'draft':
+      return {
+        role: 'master_sales',
+        staffField: 'masterSalesId',
+        reason: 'Trưởng kinh doanh cần khởi tạo ca và phân công sales theo dõi.',
+        urgency: 'aqua',
+      };
+    case 'waiting_customer_info':
+      return {
+        role: 'master_sales',
+        staffField: 'masterSalesId',
+        reason: 'Đang chờ khách bổ sung thông tin — sales theo dõi và nhắc nhở.',
+        urgency: 'amber',
+      };
+    case 'waiting_payment_confirmation':
+      return {
+        role: 'accountant',
+        staffField: 'accountantId',
+        reason: 'Kế toán cần xác nhận thanh toán để ca chuyển sang giai đoạn tiếp theo.',
+        urgency: 'amber',
+      };
+    case 'payment_confirmed':
+      return {
+        role: 'master_sales',
+        staffField: 'masterSalesId',
+        reason: 'Thanh toán đã xác nhận — sales chọn nơi thực hiện cho khách.',
+        urgency: 'aqua',
+      };
+
+    // ── Location + clinical intake ──
+    case 'waiting_location_assignment':
+      return {
+        role: 'master_sales',
+        staffField: 'masterSalesId',
+        reason: 'Sales cần chọn bệnh viện / phòng khám cho ca.',
+        urgency: 'amber',
+      };
+    case 'waiting_hospital_confirmation':
+      return {
+        role: 'coordinator',
+        staffField: 'coordinatorId',
+        reason: 'Điều phối viên đang chờ bệnh viện xác nhận lịch.',
+        urgency: 'amber',
+      };
+    case 'hospital_confirmed':
+      return {
+        role: 'doctor',
+        staffField: 'doctorId',
+        reason: 'Bệnh viện đã xác nhận — bác sĩ sẽ duyệt hồ sơ chuyên môn.',
+        urgency: 'aqua',
+      };
+    case 'waiting_doctor_review':
+      return {
+        role: 'doctor',
+        staffField: 'doctorId',
+        reason: 'Đang chờ bác sĩ duyệt hồ sơ chuyên môn.',
+        urgency: 'amber',
+      };
+    case 'waiting_lab_test':
+      return {
+        role: 'coordinator',
+        staffField: 'coordinatorId',
+        reason: 'Đang chờ kết quả xét nghiệm — điều phối viên theo dõi.',
+        urgency: 'amber',
+      };
+    case 'lab_test_done':
+      return {
+        role: 'doctor',
+        staffField: 'doctorId',
+        reason: 'Đã có kết quả xét nghiệm — bác sĩ duyệt cuối.',
+        urgency: 'aqua',
+      };
+    case 'medically_approved':
+      return {
+        role: 'master_sales',
+        staffField: 'masterSalesId',
+        reason: 'Đã đủ điều kiện chuyên môn — sales chốt lịch thủ thuật.',
+        urgency: 'aqua',
+      };
+
+    // ── Scheduling + procedure ──
+    case 'scheduled':
+      return {
+        role: 'master_sales',
+        staffField: 'masterSalesId',
+        reason: 'Đã xếp lịch — sales nhắc lịch và theo dõi check-in.',
+        urgency: 'amber',
+      };
+    case 'reminder_sent':
+      return {
+        role: 'coordinator',
+        staffField: 'coordinatorId',
+        reason: 'Đã nhắc lịch — điều phối viên chờ khách check-in.',
+        urgency: 'amber',
+      };
+    case 'checked_in':
+      return {
+        role: 'doctor',
+        staffField: 'doctorId',
+        reason: 'Khách đã check-in — bác sĩ chuẩn bị vào thủ thuật.',
+        urgency: 'amber',
+      };
+    case 'in_procedure':
+      return {
+        role: 'doctor',
+        staffField: 'doctorId',
+        reason: 'Đang thực hiện thủ thuật — bác sĩ phụ trách.',
+        urgency: 'amber',
+      };
+    case 'procedure_completed':
+      return {
+        role: 'cskh_postop',
+        staffField: 'cskhPostopId',
+        reason: 'Đã hoàn thành thủ thuật — CSKH hậu phẫu theo dõi D1 → D90.',
+        urgency: 'aqua',
+      };
+    case 'waiting_images_upload':
+      return {
+        role: 'media',
+        staffField: 'mediaId',
+        reason: 'Đang chờ media upload hình ảnh trước/sau.',
+        urgency: 'aqua',
+      };
+
+    // ── Post-op follow-up — CSKH owns every D-step ──
+    case 'post_op_d1':
+    case 'post_op_d3':
+    case 'post_op_d7':
+    case 'post_op_d14':
+    case 'post_op_d30':
+    case 'post_op_d90':
+      return {
+        role: 'cskh_postop',
+        staffField: 'cskhPostopId',
+        reason: 'Hậu phẫu — CSKH cập nhật tình trạng theo mốc D1 → D90.',
+        urgency: 'amber',
+      };
+
+    // ── Blocked / risk states ──
+    case 'medical_alert':
+      return {
+        role: 'doctor',
+        staffField: 'doctorId',
+        reason: 'Cảnh báo chuyên môn — bác sĩ xử lý ngay.',
+        urgency: 'red',
+      };
+    case 'medical_alert_resolved':
+      return {
+        role: 'doctor',
+        staffField: 'doctorId',
+        reason: 'Cảnh báo đã xử lý — bác sĩ xác nhận hoàn tất.',
+        urgency: 'red',
+      };
+    case 'complaint':
+      return {
+        role: 'cso',
+        staffField: null,
+        reason: 'Khiếu nại — CSO điều phối xử lý.',
+        urgency: 'red',
+      };
+    case 'cancelled':
+      return {
+        role: 'cso',
+        staffField: null,
+        reason: 'Ca đã hủy — CSO đánh giá và đóng case.',
+        urgency: 'red',
+      };
+    case 'postponed':
+      return {
+        role: 'master_sales',
+        staffField: 'masterSalesId',
+        reason: 'Ca đang hoãn — sales theo dõi lịch mới.',
+        urgency: 'amber',
+      };
+    case 'completed':
+      return null;
+    default:
+      return null;
+  }
+}
+
+/**
+ * Story B.4.2 — resolve a `NextOwner` to the assigned user's display name.
+ *
+ * - When `staffField` is `null`, returns the role label as a fallback (the
+ *   role does not have a dedicated assignment slot — e.g. CSO owns all
+ *   `cancelled` cases at the org level).
+ * - When `staffField` is set but the assignment is missing or empty,
+ *   returns `null` so the page renders "Chưa phân công" without crashing.
+ *
+ * Pure function — does not touch React or fetch state. Caller passes the
+ * already-loaded `staffAssignment` + `users` arrays.
+ */
+export function resolveNextOwnerName(
+  nextOwner: NextOwner | null,
+  staffAssignment: StaffAssignment | null | undefined,
+  usersMap: Map<string, { displayName: string }>,
+  roleLabel: string,
+): { displayName: string; isRoleFallback: boolean } | null {
+  if (!nextOwner) return null;
+  if (!nextOwner.staffField) {
+    return { displayName: roleLabel, isRoleFallback: true };
+  }
+  const assignedId = staffAssignment?.[nextOwner.staffField] as
+    | string
+    | string[]
+    | undefined;
+  if (!assignedId || (Array.isArray(assignedId) && assignedId.length === 0)) {
+    return null;
+  }
+  const primaryId = Array.isArray(assignedId) ? assignedId[0] : assignedId;
+  const user = primaryId ? usersMap.get(primaryId) : undefined;
+  if (!user) {
+    // Unknown user ID — render graceful "Chưa phân công" instead of leaking
+    // a raw `user-001` string (A2 anti-pattern).
+    return null;
+  }
+  return { displayName: user.displayName, isRoleFallback: false };
 }

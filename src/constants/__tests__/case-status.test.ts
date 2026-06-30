@@ -1,7 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { CASE_STATUS_TRANSITIONS, TERMINAL_STATUSES } from '@/constants/case-status';
+import {
+  CASE_STATUS_TRANSITIONS,
+  TERMINAL_STATUSES,
+  POST_OP_STATUSES,
+  getNextOwner,
+  resolveNextOwnerName,
+} from '@/constants/case-status';
 import { CASE_STATUS_CHANGE_ROLES } from '@/constants/permissions';
 import type { CaseStatus, UserRole } from '@/lib/types';
+import type { StaffAssignment } from '@/lib/types/staff-assignment';
 
 /**
  * Story B.1.2 — Remove `'scheduled'` from `hospital_confirmed` transitions.
@@ -349,5 +356,184 @@ describe("CASE_STATUS_CHANGE_ROLES — Story B.1.3 (F-CRIT-05) + RR-2", () => {
       ).includes(targetStatus);
       expect(transitionAllowed).toBe(expectTransitionAllowed);
     });
+  });
+});
+
+// ─── Story B.4.2 — getNextOwner() + resolveNextOwnerName() ──────────────
+
+describe('getNextOwner — Story B.4.2 (F-CRIT-09)', () => {
+  describe('all 29 CaseStatus values produce deterministic output', () => {
+    const ALL_CASE_STATUSES: CaseStatus[] = [
+      'draft', 'waiting_customer_info', 'waiting_payment_confirmation',
+      'payment_confirmed', 'waiting_location_assignment',
+      'waiting_hospital_confirmation', 'hospital_confirmed',
+      'waiting_doctor_review', 'waiting_lab_test', 'lab_test_done',
+      'medically_approved', 'scheduled', 'reminder_sent',
+      'checked_in', 'in_procedure', 'procedure_completed',
+      'waiting_images_upload',
+      'post_op_d1', 'post_op_d3', 'post_op_d7',
+      'post_op_d14', 'post_op_d30', 'post_op_d90',
+      'completed', 'postponed', 'cancelled',
+      'complaint', 'medical_alert', 'medical_alert_resolved',
+    ];
+
+    it.each(ALL_CASE_STATUSES)('status "%s" returns a NextOwner or null', (status) => {
+      const result = getNextOwner(status);
+      if (result === null) {
+        // Only 'completed' is null
+        expect(['completed']).toContain(status);
+      } else {
+        expect(result).toHaveProperty('role');
+        expect(result).toHaveProperty('staffField');
+        expect(result).toHaveProperty('reason');
+        expect(result).toHaveProperty('urgency');
+        expect(['red', 'amber', 'aqua']).toContain(result.urgency);
+      }
+    });
+  });
+
+  describe('completed returns null (terminal, no next owner)', () => {
+    it('returns null for completed', () => {
+      expect(getNextOwner('completed')).toBeNull();
+    });
+  });
+
+  describe('urgency colors match the expected pattern', () => {
+    it('red for blocked/risk statuses', () => {
+      const redStatuses: CaseStatus[] = [
+        'medical_alert', 'medical_alert_resolved', 'complaint', 'cancelled',
+      ];
+      for (const s of redStatuses) {
+        expect(getNextOwner(s)?.urgency).toBe('red');
+      }
+    });
+
+    it('amber for action-needed statuses', () => {
+      const amberStatuses: CaseStatus[] = [
+        'waiting_customer_info', 'waiting_payment_confirmation',
+        'waiting_location_assignment', 'waiting_hospital_confirmation',
+        'waiting_doctor_review', 'waiting_lab_test',
+        'scheduled', 'reminder_sent', 'checked_in', 'in_procedure',
+        'post_op_d1', 'post_op_d3', 'post_op_d7',
+        'post_op_d14', 'post_op_d30', 'post_op_d90',
+        'postponed',
+      ];
+      for (const s of amberStatuses) {
+        expect(getNextOwner(s)?.urgency).toBe('amber');
+      }
+    });
+
+    it('aqua for informational/handoff statuses', () => {
+      const aquaStatuses: CaseStatus[] = [
+        'draft', 'payment_confirmed', 'hospital_confirmed',
+        'lab_test_done', 'medically_approved', 'procedure_completed',
+        'waiting_images_upload',
+      ];
+      for (const s of aquaStatuses) {
+        expect(getNextOwner(s)?.urgency).toBe('aqua');
+      }
+    });
+  });
+
+  describe('every post-op status points to cskh_postop', () => {
+    it.each(POST_OP_STATUSES)('"%s" → cskh_postop', (status) => {
+      expect(getNextOwner(status)?.role).toBe('cskh_postop');
+    });
+  });
+
+  describe('roles without a dedicated staff slot have staffField=null', () => {
+    it('complaint → cso (org-level ownership, no single assignment slot)', () => {
+      expect(getNextOwner('complaint')?.staffField).toBeNull();
+    });
+    it('cancelled → cso', () => {
+      expect(getNextOwner('cancelled')?.staffField).toBeNull();
+    });
+  });
+
+  describe('reason text is non-empty Vietnamese', () => {
+    const ALL_STATUSES: CaseStatus[] = [
+      'draft', 'waiting_customer_info', 'waiting_payment_confirmation',
+      'payment_confirmed', 'waiting_location_assignment',
+      'waiting_hospital_confirmation', 'hospital_confirmed',
+      'waiting_doctor_review', 'waiting_lab_test', 'lab_test_done',
+      'medically_approved', 'scheduled', 'reminder_sent',
+      'checked_in', 'in_procedure', 'procedure_completed',
+      'waiting_images_upload',
+      'post_op_d1', 'post_op_d3', 'post_op_d7',
+      'post_op_d14', 'post_op_d30', 'post_op_d90',
+      'postponed', 'cancelled', 'complaint',
+      'medical_alert', 'medical_alert_resolved',
+    ];
+    it.each(ALL_STATUSES)('"%s" reason is non-empty Vietnamese', (status) => {
+      const reason = getNextOwner(status)?.reason ?? '';
+      expect(reason.length).toBeGreaterThan(8);
+    });
+  });
+});
+
+describe('resolveNextOwnerName — Story B.4.2 (F-CRIT-09)', () => {
+  const mockUsers = new Map([
+    ['user-001', { displayName: 'Nguyễn Văn A' }],
+    ['user-002', { displayName: 'Trần Thị B' }],
+    ['user-003', { displayName: 'Lê Văn C' }],
+  ]);
+
+  const mockStaff: StaffAssignment = {
+    id: 'sa-1', caseId: 'case-1',
+    masterSalesId: 'user-001',
+    doctorId: 'user-002',
+    cskhPostopId: 'user-003',
+    assignedBy: 'dev',
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  };
+
+  it('resolves masterSalesId from assignment', () => {
+    const owner = getNextOwner('draft')!;
+    const result = resolveNextOwnerName(owner, mockStaff, mockUsers, 'Trưởng kinh doanh');
+    expect(result?.displayName).toBe('Nguyễn Văn A');
+    expect(result?.isRoleFallback).toBe(false);
+  });
+
+  it('resolves doctorId from assignment', () => {
+    const owner = getNextOwner('waiting_doctor_review')!;
+    const result = resolveNextOwnerName(owner, mockStaff, mockUsers, 'Bác sĩ');
+    expect(result?.displayName).toBe('Trần Thị B');
+    expect(result?.isRoleFallback).toBe(false);
+  });
+
+  it('resolves cskhPostopId from assignment', () => {
+    const owner = getNextOwner('post_op_d1')!;
+    const result = resolveNextOwnerName(owner, mockStaff, mockUsers, 'CSKH sau PT');
+    expect(result?.displayName).toBe('Lê Văn C');
+  });
+
+  it('returns role fallback when staffField is null (CSO on complaint)', () => {
+    const owner = getNextOwner('complaint')!;
+    const result = resolveNextOwnerName(owner, null, mockUsers, 'Giám đốc CS');
+    expect(result?.displayName).toBe('Giám đốc CS');
+    expect(result?.isRoleFallback).toBe(true);
+  });
+
+  it('returns null when staffField is set but assignment is missing', () => {
+    const owner = getNextOwner('draft')!;
+    const emptyStaff: StaffAssignment = {
+      id: 'sa-2', caseId: 'case-2',
+      assignedBy: 'dev', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
+    };
+    const result = resolveNextOwnerName(owner, emptyStaff, mockUsers, 'Trưởng kinh doanh');
+    expect(result).toBeNull();
+  });
+
+  it('returns null when staffField is set but usersMap is empty', () => {
+    const owner = getNextOwner('draft')!;
+    const emptyMap = new Map<string, { displayName: string }>();
+    const result = resolveNextOwnerName(owner, mockStaff, emptyMap, 'Trưởng kinh doanh');
+    expect(result).toBeNull();
+  });
+
+  it('returns null for terminal status (nextOwner=null)', () => {
+    const result = resolveNextOwnerName(null, mockStaff, mockUsers, '—');
+    expect(result).toBeNull();
   });
 });

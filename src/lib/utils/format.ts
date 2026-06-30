@@ -1,17 +1,43 @@
-export function formatDateVN(input: Date | string | null | undefined): string {
-  if (!input) return '—';
-  const date = typeof input === 'string' ? new Date(input) : input;
-  if (isNaN(date.getTime())) return '—';
+type DateInput = Date | string | number | null | undefined;
+
+/**
+ * Coerce various date-shaped inputs into a valid Date instance.
+ * Handles: Date, ISO string, epoch ms (number), and Firestore Timestamp-like
+ * objects that expose `.toDate()`. Returns null for falsy or unparseable values.
+ */
+function toDate(input: unknown): Date | null {
+  if (input == null || input === '') return null;
+  if (input instanceof Date) {
+    return Number.isNaN(input.getTime()) ? null : input;
+  }
+  if (typeof input === 'string' || typeof input === 'number') {
+    const d = new Date(input);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  // Firestore Timestamp or any object with .toDate() (defensive)
+  if (typeof (input as { toDate?: () => Date })?.toDate === 'function') {
+    try {
+      const d = (input as { toDate: () => Date }).toDate();
+      return d instanceof Date && !Number.isNaN(d.getTime()) ? d : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+export function formatDateVN(input: DateInput): string {
+  const date = toDate(input);
+  if (!date) return '—';
   const d = String(date.getDate()).padStart(2, '0');
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const y = date.getFullYear();
   return `${d}/${m}/${y}`;
 }
 
-export function formatDateTimeVN(input: Date | string | null | undefined): string {
-  if (!input) return '—';
-  const date = typeof input === 'string' ? new Date(input) : input;
-  if (isNaN(date.getTime())) return '—';
+export function formatDateTimeVN(input: DateInput): string {
+  const date = toDate(input);
+  if (!date) return '—';
   const d = String(date.getDate()).padStart(2, '0');
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const y = date.getFullYear();
