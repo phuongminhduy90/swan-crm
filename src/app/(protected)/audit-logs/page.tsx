@@ -95,6 +95,7 @@ const AUDIT_ACTION_LABELS: Record<AuditAction, { label: string; icon: React.Elem
   staff_assignment_changed: { label: 'Phân công nhân sự', icon: Users, color: 'text-indigo-600 bg-indigo-50' },
   task_completed: { label: 'Hoàn thành task', icon: CheckCircle2, color: 'text-emerald-600 bg-emerald-50' },
   followup_completed: { label: 'Hoàn thành follow-up', icon: CheckCircle2, color: 'text-teal-600 bg-teal-50' },
+  followup_escalated: { label: 'Escalate follow-up', icon: AlertTriangle, color: 'text-red-600 bg-red-50' },
   role_changed: { label: 'Đổi vai trò', icon: Users, color: 'text-purple-600 bg-purple-50' },
   note_added: { label: 'Thêm ghi chú', icon: FilePlus, color: 'text-gray-600 bg-gray-50' },
 };

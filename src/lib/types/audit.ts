@@ -18,6 +18,7 @@ export type AuditAction =
   | 'staff_assignment_changed'
   | 'task_completed'
   | 'followup_completed'
+  | 'followup_escalated'
   | 'role_changed'
   | 'note_added';
 

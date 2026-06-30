@@ -1,0 +1,128 @@
+✅ Loaded .env.local (15 keys)
+╔══════════════════════════════════════════════════════════╗
+║   SWAN CRM — Real Firebase Seed (idempotent, dedup)    ║
+╚══════════════════════════════════════════════════════════╝
+Project     : swancrm-1fa61
+Started     : 2026-06-30T05:42:47.546Z
+Mode        : STRICT DEDUP — skip existing, never overwrite
+Users target: 15
+Customers   : 100 (diverse profiles)
+
+Baseline — users=16 customers=100 (preserved as-is)
+
+
+────────────────────────────────────────────────────
+  STEP 0 — Cleanup previous seed runs (only cus-seed-*, prefix-safe)
+────────────────────────────────────────────────────
+  ✅ Deleted 100 stale cus-seed-* customer docs
+  ✅ Deleted 15 previous seed users (Auth + Firestore)
+
+────────────────────────────────────────────────────
+  STEP 1/2 — Seed 15 users (Auth + Firestore profile)
+────────────────────────────────────────────────────
+  ✅ Created Auth user super.admin@swanclinic.vn (uid=XPHrkLwCJcQC0gseUusEetvXSBE2)
+  ✅ Created Firestore users/XPHrkLwCJcQC0gseUusEetvXSBE2 (admin ← super_admin)
+  ✅ Created Auth user admin.system@swanclinic.vn (uid=uQtR56I2PETtpnENlYywmeJkCv73)
+  ✅ Created Firestore users/uQtR56I2PETtpnENlYywmeJkCv73 (admin ← admin)
+  ✅ Created Auth user manager.kd@swanclinic.vn (uid=yjjXFQqic9cehzZIQReRjwDfgto1)
+  ✅ Created Firestore users/yjjXFQqic9cehzZIQReRjwDfgto1 (master_sales ← manager)
+  ✅ Created Auth user viewer.ceo@swanclinic.vn (uid=7gdsWcuqUOWUMiPuDvWheOPjvAF2)
+  ✅ Created Firestore users/7gdsWcuqUOWUMiPuDvWheOPjvAF2 (ceo ← viewer)
+  ✅ Created Auth user guest.cso@swanclinic.vn (uid=Iq2AFQYkPTcXpFNQsdb4TiYzmwU2)
+  ✅ Created Firestore users/Iq2AFQYkPTcXpFNQsdb4TiYzmwU2 (ceo ← guest)
+  ✅ Created Auth user sales.online.1@swanclinic.vn (uid=OW1KiyAcdyY87hLRWgOdrzzj9Dg1)
+  ✅ Created Firestore users/OW1KiyAcdyY87hLRWgOdrzzj9Dg1 (sales_online ← sales)
+  ✅ Created Auth user sales.online.2@swanclinic.vn (uid=DXrMb5LMpQOIayN6ocidIfCEUZI3)
+  ✅ Created Firestore users/DXrMb5LMpQOIayN6ocidIfCEUZI3 (sales_online ← sales)
+  ✅ Created Auth user sales.offline.1@swanclinic.vn (uid=dy5L7uGL0DPFnYL0wborRYWDpOn1)
+  ✅ Created Firestore users/dy5L7uGL0DPFnYL0wborRYWDpOn1 (sales_offline ← sales)
+  ✅ Created Auth user sales.offline.2@swanclinic.vn (uid=0hBA47inuPYmD32y1cYFXQY4Yul1)
+  ✅ Created Firestore users/0hBA47inuPYmD32y1cYFXQY4Yul1 (sales_offline ← sales)
+  ✅ Created Auth user doctor.1@swanclinic.vn (uid=UKpQ7EsoyNXiFdxRdoBiG2cjpLx2)
+  ✅ Created Firestore users/UKpQ7EsoyNXiFdxRdoBiG2cjpLx2 (doctor ← doctor)
+  ✅ Created Auth user doctor.2@swanclinic.vn (uid=vVZqIylA4uhhUzHtn4rgUn7H65k1)
+  ✅ Created Firestore users/vVZqIylA4uhhUzHtn4rgUn7H65k1 (doctor ← doctor)
+  ✅ Created Auth user nurse.1@swanclinic.vn (uid=U5gEtbMC83W1nBRXkXwX5Rmu3hB2)
+  ✅ Created Firestore users/U5gEtbMC83W1nBRXkXwX5Rmu3hB2 (nurse ← nurse)
+  ✅ Created Auth user nurse.2@swanclinic.vn (uid=DUuE2luFEefT8kYtW3JsSFKVTkb2)
+  ✅ Created Firestore users/DUuE2luFEefT8kYtW3JsSFKVTkb2 (nurse ← nurse)
+  ✅ Created Auth user coordinator@swanclinic.vn (uid=bJ1gsDyYzbUi42TwgVS9ZEALCcO2)
+  ✅ Created Firestore users/bJ1gsDyYzbUi42TwgVS9ZEALCcO2 (coordinator ← coordinator)
+  ✅ Created Auth user support.postop@swanclinic.vn (uid=ohSjUnrlWvPxDLUICtsW26f4DFU2)
+  ✅ Created Firestore users/ohSjUnrlWvPxDLUICtsW26f4DFU2 (cskh_postop ← support)
+
+────────────────────────────────────────────────────
+  STEP 2/2 — Seed 100 customers
+────────────────────────────────────────────────────
+  Existing customers in DB: 0 (dedup baseline)
+  …20/100 customers created
+  …40/100 customers created
+  …60/100 customers created
+  …80/100 customers created
+  …100/100 customers created
+
+  Customer seed complete: 100 created, 0 skipped, 100 attempts
+
+╔══════════════════════════════════════════════════════════╗
+║                     SEED REPORT                         ║
+╚══════════════════════════════════════════════════════════╝
+Started  : 2026-06-30T05:42:47.545Z
+Finished : 2026-06-30T05:43:48.604Z
+
+────────────────────────────────────────────────────
+  USERS
+────────────────────────────────────────────────────
+  Created : 15
+    • super.admin@swanclinic.vn          uid=XPHrkLwC…  role=admin  (← super_admin)
+    • admin.system@swanclinic.vn         uid=uQtR56I2…  role=admin  (← admin)
+    • manager.kd@swanclinic.vn           uid=yjjXFQqi…  role=master_sales  (← manager)
+    • viewer.ceo@swanclinic.vn           uid=7gdsWcuq…  role=ceo  (← viewer)
+    • guest.cso@swanclinic.vn            uid=Iq2AFQYk…  role=ceo  (← guest)
+    • sales.online.1@swanclinic.vn       uid=OW1KiyAc…  role=sales_online  (← sales)
+    • sales.online.2@swanclinic.vn       uid=DXrMb5LM…  role=sales_online  (← sales)
+    • sales.offline.1@swanclinic.vn      uid=dy5L7uGL…  role=sales_offline  (← sales)
+    • sales.offline.2@swanclinic.vn      uid=0hBA47in…  role=sales_offline  (← sales)
+    • doctor.1@swanclinic.vn             uid=UKpQ7Eso…  role=doctor  (← doctor)
+    • doctor.2@swanclinic.vn             uid=vVZqIylA…  role=doctor  (← doctor)
+    • nurse.1@swanclinic.vn              uid=U5gEtbMC…  role=nurse  (← nurse)
+    • nurse.2@swanclinic.vn              uid=DUuE2luF…  role=nurse  (← nurse)
+    • coordinator@swanclinic.vn          uid=bJ1gsDyY…  role=coordinator  (← coordinator)
+    • support.postop@swanclinic.vn       uid=ohSjUnrl…  role=cskh_postop  (← support)
+  Skipped : 0
+  Errors  : 0
+
+────────────────────────────────────────────────────
+  CUSTOMERS
+────────────────────────────────────────────────────
+  Created : 100
+    First 3:
+      • cus-seed-0001  CUS-260630-001  Võ Yến Anh  032200150
+      • cus-seed-0002  CUS-260630-002  Bùi Yến Huyền  033207163
+      • cus-seed-0003  CUS-260630-003  Đỗ Hữu Khoa  034214176
+    Last 1:
+      • cus-seed-0100  CUS-260630-100  Nguyễn Tiên Phượng  076893537
+  Skipped : 0
+  Errors  : 0
+
+────────────────────────────────────────────────────
+  ROLE MAPPING (requested → existing 12-role union)
+────────────────────────────────────────────────────
+  super_admin    → admin
+  admin          → admin
+  manager        → master_sales
+  sales          → sales_online
+  doctor         → doctor
+  nurse          → nurse
+  coordinator    → coordinator
+  support        → cskh_postop
+  viewer         → ceo
+  guest          → ceo
+
+────────────────────────────────────────────────────
+  COLLECTIONS TOUCHED
+────────────────────────────────────────────────────
+  • users (Firestore) + Firebase Auth
+  • customers
+
+✅ Seed run complete. All created docs preserve existing data untouched.
+   Re-running is safe: existing emails/phones are skipped, never overwritten.

@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Menu, LogOut, User as UserIcon, ChevronDown, Bell, BellRing,
-  CheckCheck, Loader2, AlertCircle, DollarSign, Calendar, FileText,
+  CheckCheck, Loader2, AlertCircle, AlertTriangle, DollarSign, Calendar, FileText,
   Image as ImageIcon, Activity, Stethoscope, MessageCircle, CheckCircle2,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/AuthProvider';
@@ -37,6 +37,7 @@ const EVENT_ICONS: Record<NotificationEventType, React.ElementType> = {
   complaint: MessageCircle,
   medical_alert: AlertCircle,
   medical_alert_resolved: CheckCircle2,
+  followup_escalation: AlertTriangle,
 };
 
 function relativeTime(iso: string): string {

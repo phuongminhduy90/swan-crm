@@ -3,6 +3,7 @@ import {
   setDocument,
   updateDocument,
   getAllDocuments,
+  getDocument,
 } from '@/lib/firebase/firestore';
 import { addDays, format } from 'date-fns';
 
@@ -72,4 +73,16 @@ export async function updateFollowup(
   input: UpdateFollowupInput,
 ): Promise<void> {
   await updateDocument(COLLECTION, id, input);
+}
+
+/**
+ * Story B.1.5 (F-HIGH-20) — Read a single followup by ID.
+ *
+ * Needed by `/api/followups/[id]` to capture the `prev` snapshot before
+ * applying a status / painLevel update, so the escalation decision can
+ * detect a transition (e.g. pain: 3 → 5).
+ */
+export async function getFollowup(id: string): Promise<Followup | null> {
+  const data = await getDocument<Record<string, unknown>>(COLLECTION, id);
+  return data ? (data as unknown as Followup) : null;
 }

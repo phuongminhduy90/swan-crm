@@ -7,6 +7,7 @@ import {
   buildMedicalAlertNotification,
   buildComplaintNotification,
   buildPostOpFollowupDueNotification,
+  buildFollowupEscalationNotification,
 } from './templates';
 import { getStaffAssignment } from '@/lib/firestore/staff-assignments';
 import { getAllUsers } from '@/lib/firestore/users';
@@ -312,4 +313,64 @@ export function triggerComplaint(caseRecord: CaseRecord): void {
 
 function dedupe<T>(arr: T[]): T[] {
   return Array.from(new Set(arr));
+}
+
+/**
+ * Story B.1.5 (F-HIGH-20) — Fire-and-forget: escalate a followup to the
+ * assigned doctor + nurse when a patient reports painLevel >= 4 OR when
+ * the followup status moves to `issue_reported`.
+ *
+ * Recipient resolution comes from `@/lib/followups/escalate.ts`
+ * (`resolveEscalationRecipients`):
+ *   1. Look up the case's staff assignment (`doctorId` + `nurseIds`).
+ *   2. Resolve display names from the user directory.
+ *   3. Fall back to every active `doctor` / `nurse` user if the
+ *      assignment has no clinical staff.
+ *   4. Always preserve baseline roles `cso` + `admin` as a safety net.
+ *
+ * Per anti-pattern gate A11:
+ *   - The notification body includes ONLY case code, customer display
+ *     name, followup day, pain level, and resolved staff display names.
+ *   - PII fields (`medicalNote`, `privacyNote`, `nationalIdNumber`,
+ *     `address`) are NEVER part of the payload.
+ *
+ * The caller (route handler) is expected to have already passed the
+ * `evaluateEscalation` gate — this trigger does not re-evaluate
+ * thresholds or dedup. It receives the resolved recipients so it cannot
+ * accidentally double-fire on transient failures inside the trigger.
+ *
+ * @see docs/ux-redesign/STORY_B1_5_IMPLEMENTATION_REPORT.md
+ */
+export function triggerFollowupEscalation(input: {
+  caseRecord: CaseRecord;
+  customerName: string;
+  followupDay: string;
+  painLevel?: number;
+  trigger: 'pain_above_threshold' | 'issue_reported';
+  recipientUserIds: string[];
+  recipientRoles: UserRole[];
+  doctorNames: string[];
+  nurseNames: string[];
+}): void {
+  try {
+    const { title, body } = buildFollowupEscalationNotification({
+      caseCode: input.caseRecord.caseCode,
+      customerName: input.customerName,
+      followupDay: input.followupDay,
+      painLevel: input.painLevel,
+      trigger: input.trigger,
+      doctorNames: input.doctorNames,
+      nurseNames: input.nurseNames,
+    });
+    void sendInAppNotification({
+      eventType: 'followup_escalation',
+      title,
+      body,
+      caseId: input.caseRecord.id,
+      recipientUserIds: input.recipientUserIds,
+      recipientRoles: input.recipientRoles,
+    });
+  } catch (err) {
+    console.error('[triggerFollowupEscalation] Failed:', err);
+  }
 }

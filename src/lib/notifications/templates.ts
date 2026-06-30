@@ -180,3 +180,49 @@ export function buildPostOpFollowupDueNotification(data: {
     body: `Khách: ${customerName}\nMốc: ${followupDay}\nĐược giao: ${assigneeName}\nVui lòng liên hệ khách hàng để cập nhật tình trạng.`,
   };
 }
+
+/**
+ * Story B.1.5 (F-HIGH-20) — Auto-escalation notification template.
+ *
+ * Per anti-pattern gate A11 + medical sign-off checklist §7.2.5:
+ *   - No PII fields (nationalIdNumber, medicalNote, privacyNote, address).
+ *   - Includes only customer display name (already-known identifier for
+ *     clinicians), pain level (the trigger signal), followup day (the
+ *     tracking milestone), and the resolved doctor + nurse names so the
+ *     recipient knows who is on the case.
+ *
+ * @see docs/ux-redesign/STORY_B1_5_IMPLEMENTATION_REPORT.md
+ */
+export function buildFollowupEscalationNotification(data: {
+  caseCode: string;
+  customerName: string;
+  followupDay: string;
+  painLevel?: number;
+  trigger: 'pain_above_threshold' | 'issue_reported';
+  doctorNames: string[];
+  nurseNames: string[];
+}): { title: string; body: string } {
+  const { caseCode, customerName, followupDay, painLevel, trigger, doctorNames, nurseNames } = data;
+
+  const triggerLine =
+    trigger === 'pain_above_threshold' && typeof painLevel === 'number'
+      ? `Mức đau: ${painLevel}/10 (vượt ngưỡng 4)`
+      : 'Bệnh nhân báo cáo có vấn đề sau thủ thuật';
+
+  const teamLines: string[] = [];
+  if (doctorNames.length > 0) teamLines.push(`Bác sĩ phụ trách: ${doctorNames.join(', ')}`);
+  if (nurseNames.length > 0) teamLines.push(`Y tá phụ trách: ${nurseNames.join(', ')}`);
+
+  const body = [
+    `Khách: ${customerName}`,
+    `Mốc hậu phẫu: ${followupDay}`,
+    triggerLine,
+    '',
+    ...(teamLines.length > 0 ? teamLines : ['Vui lòng kiểm tra ca và phản hồi trong vòng 30 phút.']),
+  ].join('\n');
+
+  return {
+    title: `🚨 CẢNH BÁO HẬU PHẪU — ${caseCode}`,
+    body,
+  };
+}

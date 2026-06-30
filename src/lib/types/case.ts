@@ -85,6 +85,16 @@ export interface CaseRecord {
 
   /** Soft-delete flag — false khi bị cascade-delete từ customer deletion */
   active?: boolean;
+
+  /**
+   * Story B.1.5 (F-HIGH-20) — Timestamp of the last auto-escalation
+   * triggered by a followup painLevel >= 4 / issue_reported. Used for a
+   * 6h debounce window so a noisy case does not flood doctor/nurse with
+   * duplicate notifications. Optional for backward compatibility —
+   * cases predating the story have no value and are treated as
+   * "never escalated" (so the first escalation fires).
+   */
+  lastEscalatedAt?: string;
 }
 
 export interface CreateCaseInput {
@@ -113,6 +123,8 @@ export interface UpdateCaseInput extends Partial<CreateCaseInput> {
   amountPaid?: number;
   remainingAmount?: number;
   paymentStatus?: PaymentStatus;
+  /** Story B.1.5 — updated by the auto-escalation debounce mechanism. */
+  lastEscalatedAt?: string;
 }
 
 export interface CaseService {
