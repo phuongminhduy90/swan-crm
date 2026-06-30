@@ -11,10 +11,11 @@ import {
 import { useAuth } from '@/lib/auth/AuthProvider';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/components/ui/toast';
 import { ROLE_LABELS } from '@/config/roles';
 import { PAGE_TITLES } from '@/config/constants';
 import { signOut } from '@/lib/firebase/auth';
-import { Notification, NotificationEventType } from '@/lib/types';
+import { Notification, NotificationEventType, UserRole } from '@/lib/types';
 import { cn } from '@/lib/utils/cn';
 
 interface TopbarProps {
@@ -56,6 +57,7 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { userProfile, isDevMode, setDevRole, devRole } = useAuth();
+  const { toast } = useToast();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -119,6 +121,16 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
     }
   }
 
+  // Story 6.3.4 / B.4.4 (F-HIGH-01) — "Hồ sơ" menu item is a placeholder
+  // for the (not-yet-built) user profile page. A8 anti-pattern requires no
+  // dead `href="#"`; instead we show a Vietnamese info toast that the feature
+  // is in development. Closes the user menu so the toast is the only surface
+  // the user sees after clicking.
+  function handleProfilePlaceholder() {
+    setMenuOpen(false);
+    toast('Tính năng đang phát triển', 'info');
+  }
+
   async function handleNotificationClick(n: Notification) {
     if (!n.readBy?.includes(currentUserId)) {
       await fetch(`/api/notifications/${n.id}/read`, {
@@ -179,7 +191,7 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
             <Badge variant="warning">DEV</Badge>
             <select
               value={devRole ?? 'admin'}
-              onChange={(e) => setDevRole(e.target.value as never)}
+              onChange={(e) => setDevRole(e.target.value as UserRole)}
               className="bg-transparent text-xs font-medium text-amber-800 focus:outline-none"
             >
               {Object.keys(ROLE_LABELS).map((r) => (
@@ -319,8 +331,11 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
               </div>
               <div className="py-1">
                 <button
+                  type="button"
+                  data-testid="topbar-profile-menu-item"
+                  aria-label="Hồ sơ (đang phát triển)"
                   className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-gray-700 transition-colors hover:bg-swan-50/60 hover:text-swan-700"
-                  onClick={() => setMenuOpen(false)}
+                  onClick={handleProfilePlaceholder}
                 >
                   <UserIcon className="h-4 w-4" />
                   Thông tin cá nhân
