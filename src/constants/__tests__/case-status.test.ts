@@ -176,21 +176,35 @@ describe("CASE_STATUS_TRANSITIONS — Story B.2.2 (F-HIGH-19)", () => {
  * test pins down the role allow-list so future role/permission changes can't
  * silently re-grant status-change to unauthorized roles.
  *
+ * Story RR-2 (Sprint 6.2 carry-over): `nurse` and `cskh_postop` were removed
+ * from `CASE_STATUS_CHANGE_ROLES` because they lack `cases:write` permission
+ * (the route already 403s them at the `requirePermission('cases:write')`
+ * gate). The 5 remaining roles all hold `cases:write`.
+ *
  * @see docs/ux-redesign/STORY_B1_3_IMPLEMENTATION_REPORT.md
+ * @see docs/ux-redesign/RR_2_IMPLEMENTATION_REPORT.md
  */
-describe("CASE_STATUS_CHANGE_ROLES — Story B.1.3 (F-CRIT-05)", () => {
-  describe("allow-list contents (Decision A — locked from Appendix A Q1)", () => {
+describe("CASE_STATUS_CHANGE_ROLES — Story B.1.3 (F-CRIT-05) + RR-2", () => {
+  describe("allow-list contents (Decision A — locked from Appendix A Q1 + RR-2 reconcile)", () => {
     it("includes management roles", () => {
       expect(CASE_STATUS_CHANGE_ROLES).toContain('admin');
       expect(CASE_STATUS_CHANGE_ROLES).toContain('cso');
       expect(CASE_STATUS_CHANGE_ROLES).toContain('master_sales');
     });
 
-    it("includes clinical / coordination roles", () => {
+    it("includes clinical / coordination roles that hold `cases:write`", () => {
+      // RR-2: removed `nurse` and `cskh_postop` because they do NOT hold
+      // `cases:write` in `ROLE_PERMISSIONS`. They were dead-code entries —
+      // the route's `requirePermission('cases:write')` gate already 403s
+      // them before the role-list check runs.
       expect(CASE_STATUS_CHANGE_ROLES).toContain('coordinator');
       expect(CASE_STATUS_CHANGE_ROLES).toContain('doctor');
-      expect(CASE_STATUS_CHANGE_ROLES).toContain('nurse');
-      expect(CASE_STATUS_CHANGE_ROLES).toContain('cskh_postop');
+    });
+
+    it("does NOT include roles without `cases:write` permission (RR-2 reconcile)", () => {
+      // nurse + cskh_postop lack cases:write — removed in RR-2.
+      expect(CASE_STATUS_CHANGE_ROLES).not.toContain('nurse');
+      expect(CASE_STATUS_CHANGE_ROLES).not.toContain('cskh_postop');
     });
 
     it("does NOT include sales roles (Decision A: sales loses status-change rights)", () => {
@@ -202,6 +216,13 @@ describe("CASE_STATUS_CHANGE_ROLES — Story B.1.3 (F-CRIT-05)", () => {
       expect(CASE_STATUS_CHANGE_ROLES).not.toContain('ceo');
       expect(CASE_STATUS_CHANGE_ROLES).not.toContain('accountant');
       expect(CASE_STATUS_CHANGE_ROLES).not.toContain('media');
+    });
+
+    it("contains exactly the 5 RR-2 reconciled roles", () => {
+      expect(CASE_STATUS_CHANGE_ROLES).toHaveLength(5);
+      expect([...CASE_STATUS_CHANGE_ROLES].sort()).toEqual(
+        ['admin', 'coordinator', 'cso', 'doctor', 'master_sales'].sort(),
+      );
     });
   });
 

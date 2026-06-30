@@ -79,15 +79,27 @@ export const PAYMENT_CREATE_ROLES: UserRole[] = [
   'accountant',
 ];
 
-// Which roles can change case status (generic — all allowed roles)
+// Which roles can change case status (generic — all allowed roles).
+//
+// Story RR-2 (carry-over from Sprint 6.1): removed `nurse` and `cskh_postop`.
+// Both roles lack the `cases:write` permission in `ROLE_PERMISSIONS`, so the
+// server route's `requirePermission('cases:write')` gate already rejected them
+// with 403. Listing them here was dead code that misled downstream readers
+// about which roles could actually change status. The invariant is now pinned
+// by `src/constants/__tests__/permissions.test.ts`.
+//
+// Remaining 5 roles all hold `cases:write`:
+//   - admin       (full)
+//   - cso         (operations lead)
+//   - master_sales (sales lead — assigned/creates cases)
+//   - coordinator (clinical scheduling)
+//   - doctor      (clinical review)
 export const CASE_STATUS_CHANGE_ROLES: UserRole[] = [
   'admin',
   'cso',
   'master_sales',
   'coordinator',
   'doctor',
-  'nurse',
-  'cskh_postop',
 ];
 
 // Which roles can cancel or postpone a case

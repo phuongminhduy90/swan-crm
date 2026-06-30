@@ -395,19 +395,28 @@ describe('PATCH /api/cases/[id]/status — Story B.1.3 (F-CRIT-05)', () => {
   // ── 6. Allow-list invariant (pinned in code AND data) ─────────────────────
 
   describe('CASE_STATUS_CHANGE_ROLES allow-list invariants', () => {
-    it('contains exactly the 7 roles specified by Decision A', () => {
+    it('contains exactly the 5 roles after RR-2 reconciliation', () => {
       // If this list changes, the B.1.3 RBAC contract changes. Pin the
       // expected size so a future PR cannot silently add/remove a role
       // without updating the documented decision.
-      expect(CASE_STATUS_CHANGE_ROLES).toHaveLength(7);
+      //
+      // RR-2 (Sprint 6.2): removed `nurse` and `cskh_postop` because they
+      // lack `cases:write` — the route's `requirePermission('cases:write')`
+      // gate already 403s them. See RR_2_IMPLEMENTATION_REPORT.md.
+      expect(CASE_STATUS_CHANGE_ROLES).toHaveLength(5);
       expect([...CASE_STATUS_CHANGE_ROLES].sort()).toEqual(
-        ['admin', 'cskh_postop', 'coordinator', 'cso', 'doctor', 'master_sales', 'nurse'].sort(),
+        ['admin', 'coordinator', 'cso', 'doctor', 'master_sales'].sort(),
       );
     });
 
     it('does NOT include any sales role (Decision A)', () => {
       expect(CASE_STATUS_CHANGE_ROLES).not.toContain('sales_online');
       expect(CASE_STATUS_CHANGE_ROLES).not.toContain('sales_offline');
+    });
+
+    it('does NOT include roles without `cases:write` permission (RR-2 invariant)', () => {
+      expect(CASE_STATUS_CHANGE_ROLES).not.toContain('nurse');
+      expect(CASE_STATUS_CHANGE_ROLES).not.toContain('cskh_postop');
     });
   });
 
