@@ -1,9 +1,15 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { CheckCircle, XCircle, Clock, RefreshCw, ShieldAlert } from 'lucide-react';
-import { Payment } from '@/lib/types';
-import { getAllPayments, getPaymentsByCase, confirmPayment, rejectPayment } from '@/lib/firestore';
+import { Payment, User } from '@/lib/types';
+import {
+  getAllPayments,
+  getPaymentsByCase,
+  confirmPayment,
+  rejectPayment,
+  getAllUsers,
+} from '@/lib/firestore';
 import { useAuth } from '@/lib/auth/AuthProvider';
 import { formatDateVN, formatCurrency } from '@/lib/utils/format';
 import { DataTable } from '@/components/ui/data-table';
@@ -41,6 +47,10 @@ export function PaymentList({ caseId, statusFilter, paymentTypeFilter, refresh }
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [confirmingPayment, setConfirmingPayment] = useState<Payment | null>(null);
+  // Story 6.3.3 / B.4.3 (F-HIGH-17): resolve createdBy / receivedBy /
+  // confirmedBy user IDs to display names (closes A2 anti-pattern: raw
+  // `user-XXX` IDs in payment list copy).
+  const [users, setUsers] = useState<User[]>([]);
 
   // Story B.3.1 (F-CRIT-06): read the role allow-list from the static
   // contract instead of hardcoding `'accountant' || 'admin'`. The previous
@@ -56,16 +66,36 @@ export function PaymentList({ caseId, statusFilter, paymentTypeFilter, refresh }
   // that case anyway, but hiding it improves UX (no rejected click).
   const sodEnabled = isFlagEnabled('PAYMENT_SOD');
 
+  // Story 6.3.3 / B.4.3: build a Map<userId, displayName> once, instead of
+  // scanning the array on every row render. Falls back to the original ID
+  // if a user is missing (e.g. legacy data, deleted account) so the table
+  // never crashes on an unresolved reference.
+  const usersMap = useMemo(
+    () => new Map(users.map((u) => [u.id, u] as const)),
+    [users],
+  );
+  const getUserName = useCallback(
+    (id: string | undefined): string => {
+      if (!id) return '—';
+      return usersMap.get(id)?.displayName ?? '—';
+    },
+    [usersMap],
+  );
+
   const load = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = caseId ? await getPaymentsByCase(caseId) : await getAllPayments();
+      const [data, usersData] = await Promise.all([
+        caseId ? getPaymentsByCase(caseId) : getAllPayments(),
+        getAllUsers(),
+      ]);
       let filtered = statusFilter ? data.filter((p) => p.status === statusFilter) : data;
       if (paymentTypeFilter) {
         filtered = filtered.filter((p) => p.paymentType === paymentTypeFilter);
       }
       setPayments(filtered);
+      setUsers(usersData);
     } catch {
       setError('Không thể tải danh sách thanh toán');
     } finally {
@@ -150,7 +180,29 @@ export function PaymentList({ caseId, statusFilter, paymentTypeFilter, refresh }
       key: 'createdBy',
       header: 'Người nhập',
       render: (row: Payment) => (
-        <span className="text-xs text-gray-500">{row.createdBy}</span>
+        <span className="text-xs font-medium text-gray-700">
+          {getUserName(row.createdBy)}
+        </span>
+      ),
+    },
+    {
+      key: 'receivedBy',
+      header: 'Người nhận',
+      render: (row: Payment) => (
+        <span className="text-xs text-gray-600">
+          {getUserName(row.receivedBy)}
+        </span>
+      ),
+    },
+    {
+      key: 'confirmedBy',
+      header: 'Người xác nhận',
+      render: (row: Payment) => (
+        <span className="text-xs text-gray-600">
+          {row.status === 'confirmed'
+            ? getUserName(row.confirmedBy)
+            : <span className="text-gray-400">—</span>}
+        </span>
       ),
     },
     {
