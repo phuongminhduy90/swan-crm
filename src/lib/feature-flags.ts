@@ -25,7 +25,8 @@ export type FeatureFlag =
   | 'SERVER_RBAC' // Story B.1.3 — server-side role enforcement for case status
   | 'PAYMENT_SOD' // Story B.3.1 — payment separation of duties
   | 'CLINICAL_CHECKLIST' // Story B.2.1 — UI: render 6 clinical items
-  | 'CHECKLIST_GATE'; // Story B.2.1 — server + UI: enforce allPassed on gated transitions
+  | 'CHECKLIST_GATE' // Story B.2.1 — server + UI: enforce allPassed on gated transitions
+  | 'MINH_SCREEN'; // Story B.4.1 — Replace h-screen with min-h-screen to fix iOS Safari URL-bar overlap
 
 const ENV_PREFIX = 'NEXT_PUBLIC_FEATURE_';
 

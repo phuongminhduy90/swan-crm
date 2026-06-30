@@ -59,4 +59,14 @@ describe('feature-flags — isFlagEnabled()', () => {
     expect(isFlagEnabled('SERVER_RBAC')).toBe(false);
     expect(isFlagEnabled('PAYMENT_SOD')).toBe(false);
   });
+
+  it('returns false for the MINH_SCREEN flag when env is missing (Story B.4.1)', () => {
+    delete process.env.NEXT_PUBLIC_FEATURE_MINH_SCREEN;
+    expect(isFlagEnabled('MINH_SCREEN')).toBe(false);
+  });
+
+  it('returns true for the MINH_SCREEN flag when env is "true" (Story B.4.1)', () => {
+    process.env.NEXT_PUBLIC_FEATURE_MINH_SCREEN = 'true';
+    expect(isFlagEnabled('MINH_SCREEN')).toBe(true);
+  });
 });
