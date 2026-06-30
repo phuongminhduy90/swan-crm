@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { AlertCircle, MapPin, Calendar } from 'lucide-react';
 import {
@@ -21,8 +21,16 @@ import { cn } from '@/lib/utils/cn';
 
 const PAGE_SIZE = 15;
 
+/**
+ * Status filter chip options. `lab_overdue` is a special URL-only filter
+ * (F-CRIT-07) — driven by the dashboard's `Lab quá hạn` stat card. It is
+ * NOT rendered as a chip; it activates via the `?status=lab_overdue` query
+ * param and shows an inline notice with a "Bỏ lọc" button.
+ */
+type StatusFilterValue = CaseStatus | 'all' | 'post_op' | 'lab_overdue';
+
 // Status filter chip groups
-const STATUS_FILTER_OPTIONS: { label: string; value: CaseStatus | 'all' | 'post_op' }[] = [
+const STATUS_FILTER_OPTIONS: { label: string; value: StatusFilterValue }[] = [
   { label: 'Tất cả', value: 'all' },
   { label: 'Nháp', value: 'draft' },
   { label: 'Chờ TT', value: 'waiting_payment_confirmation' },
@@ -41,6 +49,55 @@ const POST_OP_STATUSES: CaseStatus[] = [
   'post_op_d1', 'post_op_d3', 'post_op_d7',
   'post_op_d14', 'post_op_d30', 'post_op_d90',
 ];
+
+/** URL `?status=` → internal filter value mapping (F-CRIT-07). */
+function parseStatusParam(raw: string | null): StatusFilterValue {
+  if (!raw) return 'all';
+  if (raw === 'lab_overdue') return 'lab_overdue';
+  if (raw === 'post_op') return 'post_op';
+  // Allow any CaseStatus literal
+  const known: StatusFilterValue[] = [
+    'all', 'post_op', 'lab_overdue',
+    'draft', 'waiting_customer_info', 'waiting_payment_confirmation',
+    'payment_confirmed', 'waiting_location_assignment',
+    'waiting_hospital_confirmation', 'hospital_confirmed',
+    'waiting_doctor_review', 'waiting_lab_test', 'lab_test_done',
+    'medically_approved', 'scheduled', 'reminder_sent', 'checked_in',
+    'in_procedure', 'procedure_completed', 'waiting_images_upload',
+    'post_op_d1', 'post_op_d3', 'post_op_d7',
+    'post_op_d14', 'post_op_d30', 'post_op_d90',
+    'completed', 'postponed', 'cancelled', 'complaint', 'medical_alert',
+  ];
+  return known.includes(raw as StatusFilterValue) ? (raw as StatusFilterValue) : 'all';
+}
+
+/** Inverse of `parseStatusParam` — what to write to the URL. */
+function serializeStatusParam(value: StatusFilterValue): string | null {
+  if (value === 'all') return null;
+  return value;
+}
+
+/**
+ * F-CRIT-07 — a case is `lab_overdue` when status is `waiting_lab_test`,
+ * an `expectedLabDate` exists, and that date is strictly before today
+ * (date-only comparison). Excludes terminal statuses by virtue of the
+ * status check.
+ *
+ * Exported for unit testing.
+ */
+export function isLabOverdue(c: CaseRecord, now: Date = new Date()): boolean {
+  if (c.status !== 'waiting_lab_test') return false;
+  if (!c.expectedLabDate) return false;
+  const labDate = new Date(c.expectedLabDate);
+  if (Number.isNaN(labDate.getTime())) return false;
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const labDateStart = new Date(
+    labDate.getFullYear(),
+    labDate.getMonth(),
+    labDate.getDate(),
+  ).getTime();
+  return labDateStart < todayStart;
+}
 
 const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
   unpaid: 'Chưa thu',
@@ -70,6 +127,7 @@ interface CaseListProps {
 
 export function CaseList({ onTotalChange }: CaseListProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [cases, setCases] = useState<CaseRecord[]>([]);
   const [customersMap, setCustomersMap] = useState<Record<string, Customer>>({});
@@ -78,7 +136,10 @@ export function CaseList({ onTotalChange }: CaseListProps) {
   const [error, setError] = useState<string | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<CaseStatus | 'all' | 'post_op'>('all');
+  // Initial value synced from `?status=` query param (F-CRIT-07)
+  const [statusFilter, setStatusFilter] = useState<StatusFilterValue>(
+    () => parseStatusParam(searchParams.get('status')),
+  );
   const [page, setPage] = useState(1);
 
   // Load all data
@@ -111,6 +172,32 @@ export function CaseList({ onTotalChange }: CaseListProps) {
     load();
   }, []);
 
+  // Re-sync status filter when URL `?status=` changes (back/forward navigation)
+  useEffect(() => {
+    const fromUrl = parseStatusParam(searchParams.get('status'));
+    setStatusFilter(fromUrl);
+  }, [searchParams]);
+
+  /**
+   * Update filter + push the change into the URL so the page is bookmarkable
+   * and so the dashboard link is honored on refresh.
+   */
+  const updateStatusFilter = useCallback(
+    (next: StatusFilterValue) => {
+      setStatusFilter(next);
+      const params = new URLSearchParams(Array.from(searchParams.entries()));
+      const serialized = serializeStatusParam(next);
+      if (serialized === null) {
+        params.delete('status');
+      } else {
+        params.set('status', serialized);
+      }
+      const qs = params.toString();
+      router.replace(qs ? `/cases?${qs}` : '/cases', { scroll: false });
+    },
+    [router, searchParams],
+  );
+
   // Filter cases
   const filteredCases = useMemo(() => {
     let result = cases;
@@ -119,6 +206,9 @@ export function CaseList({ onTotalChange }: CaseListProps) {
     if (statusFilter !== 'all') {
       if (statusFilter === 'post_op') {
         result = result.filter((c) => POST_OP_STATUSES.includes(c.status));
+      } else if (statusFilter === 'lab_overdue') {
+        const now = new Date();
+        result = result.filter((c) => isLabOverdue(c, now));
       } else {
         result = result.filter((c) => c.status === statusFilter);
       }
@@ -148,6 +238,9 @@ export function CaseList({ onTotalChange }: CaseListProps) {
   useEffect(() => {
     setPage(1);
   }, [searchQuery, statusFilter]);
+
+  /** True when the user arrived here via the dashboard's `Lab quá hạn` card. */
+  const isLabOverdueFilter = statusFilter === 'lab_overdue';
 
   const totalPages = Math.ceil(filteredCases.length / PAGE_SIZE);
   const paginated = filteredCases.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -288,12 +381,32 @@ export function CaseList({ onTotalChange }: CaseListProps) {
         </p>
       </div>
 
+      {/* Lab-overdue inline notice (F-CRIT-07) — only when filter was set via the dashboard link. */}
+      {isLabOverdueFilter && (
+        <div
+          role="status"
+          className="flex flex-wrap items-center gap-3 rounded-xl border border-red-200 bg-red-50/70 px-4 py-3 text-sm text-red-800"
+        >
+          <AlertCircle className="h-4 w-4 shrink-0 text-red-500" aria-hidden="true" />
+          <span className="flex-1">
+            Đang lọc các ca chờ xét nghiệm đã quá hạn lịch hẹn.
+          </span>
+          <button
+            type="button"
+            onClick={() => updateStatusFilter('all')}
+            className="rounded-lg border border-red-200 bg-white px-3 py-1 text-xs font-medium text-red-700 transition-all hover:bg-red-100"
+          >
+            Bỏ lọc
+          </button>
+        </div>
+      )}
+
       {/* Status Filter Chips */}
       <div className="flex flex-wrap gap-2">
         {STATUS_FILTER_OPTIONS.map((opt) => (
           <button
             key={opt.value}
-            onClick={() => setStatusFilter(opt.value as typeof statusFilter)}
+            onClick={() => updateStatusFilter(opt.value)}
             className={cn(
               'rounded-full border px-3 py-1 text-xs font-medium transition-all',
               statusFilter === opt.value
@@ -320,7 +433,7 @@ export function CaseList({ onTotalChange }: CaseListProps) {
         columns={columns}
         data={paginated}
         loading={loading}
-        emptyMessage="Không tìm thấy hồ sơ nào"
+        emptyMessage={isLabOverdueFilter ? 'Không có ca chờ xét nghiệm nào quá hạn' : 'Không tìm thấy hồ sơ nào'}
         page={page}
         totalPages={totalPages}
         onPageChange={setPage}
