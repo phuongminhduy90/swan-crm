@@ -10,6 +10,17 @@ export const SWAN_COLORS = {
   navy: '#1E3A5F',
 } as const;
 
+// B.3.4 (F-HIGH-33): refund series configuration. The red color (#EF4444)
+// matches the cancelled-status red so users immediately associate refund with
+// money flowing out. The label is shown in the Recharts legend and tooltip
+// header; the description is appended to the tooltip when the refund line is
+// hovered so users see "Tổng hoàn tiền đã xác nhận trong kỳ" verbatim.
+export const REFUND_SERIES = {
+  color: '#EF4444',
+  label: 'Hoàn tiền',
+  description: 'Tổng hoàn tiền đã xác nhận trong kỳ',
+} as const;
+
 // Palette for multi-segment charts (pied, stacked bars)
 export const CHART_PALETTE = [
   '#00ADBE', // aqua

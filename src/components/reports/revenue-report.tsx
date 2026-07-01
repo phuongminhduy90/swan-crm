@@ -48,9 +48,12 @@ export function RevenueReport({ payments, cases, dateRange }: RevenueReportProps
   }, [filteredPayments]);
 
   // Monthly trend
-  // B.3.3 (F-HIGH-33): per-month refund tracking so the revenue chart can draw
-  // a red refund line + annotation. Refund amount is only accumulated for
-  // confirmed refund payments (matches the existing total-refund accounting).
+  // B.3.4 (F-HIGH-33): per-month refund tracking so the revenue chart can
+  // draw a red refund line + "Đã xác nhận − Hoàn tiền" annotation. Refund
+  // amount is only accumulated for confirmed refund payments (matches the
+  // existing total-refund accounting). The `refund` field is always
+  // populated (defaulting to 0) so the refund `<Line>` always renders even
+  // when no refunds exist in the period — the line stays flat at 0.
   const monthlyData: MonthlyRevenuePoint[] = useMemo(() => {
     const map = new Map<string, { confirmed: number; pending: number; refund: number }>();
     for (const p of filteredPayments) {
@@ -63,7 +66,7 @@ export function RevenueReport({ payments, cases, dateRange }: RevenueReportProps
       } else if (p.status !== 'confirmed') {
         entry.pending += p.amount ?? 0;
       }
-      // B.3.3: track refund separately so the chart can render the red line
+      // B.3.4: track refund separately so the chart can render the red line
       if (p.paymentType === 'refund' && p.status === 'confirmed') {
         entry.refund += p.amount ?? 0;
       }
