@@ -2,6 +2,7 @@
 
 import { KeyboardEvent, ReactNode, useId, useRef, useState } from 'react';
 import { cn } from '@/lib/utils/cn';
+import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
 
 export interface TabItem {
   id: string;
@@ -9,6 +10,8 @@ export interface TabItem {
   icon?: ReactNode;
   badge?: ReactNode;
 }
+
+export type TabsIconOnlyMode = 'auto' | 'always' | 'never';
 
 interface TabsProps {
   items: TabItem[];
@@ -34,6 +37,20 @@ interface TabsProps {
    * `aria-controls` entirely.
    */
   panelIds?: string[];
+  /**
+   * Story C.1.2 (Sprint 7.1) — when `'auto'`, the tab label is hidden below
+   * the Tailwind `sm` breakpoint (≤ 640 px viewport) and only the icon is
+   * rendered. Use `'always'` to force icon-only at every viewport; use
+   * `'never'` to always render icon + label.
+   *
+   * Accessibility: when icon-only, the button gains `aria-label` and the
+   * native `title` attribute so the label is exposed to screen readers and
+   * surfaces as a tooltip on hover/focus. The icon itself is marked
+   * `aria-hidden="true"` so it isn't double-announced.
+   *
+   * Default: `'auto'`.
+   */
+  iconOnly?: TabsIconOnlyMode;
 }
 
 /**
@@ -60,6 +77,7 @@ export function Tabs({
   variant = 'pill',
   idPrefix,
   panelIds,
+  iconOnly = 'auto',
 }: TabsProps) {
   const generatedPrefix = `tabs-${useId().replace(/:/g, '')}`;
   const prefix = idPrefix ?? generatedPrefix;
@@ -73,6 +91,13 @@ export function Tabs({
   // without panels can opt out.
   const panelsEnabled = panelIds ?? items.map((item) => item.id);
   const hasPanel = (id: string) => panelsEnabled.includes(id);
+  // Story C.1.2 — resolve the `auto` mode against the Tailwind `sm` breakpoint
+  // (640 px). `useMediaQuery` is SSR-safe (returns `false` until mounted), so
+  // the first client render still defaults to icon-only — matching the
+  // expected mobile-first default and avoiding a layout flash on hydration.
+  const isAtLeastSm = useMediaQuery('(min-width: 640px)');
+  const labelsVisible =
+    iconOnly === 'never' || (iconOnly === 'auto' && isAtLeastSm);
 
   function select(id: string) {
     if (activeId === undefined) setInternalActive(id);
@@ -154,6 +179,8 @@ export function Tabs({
               role="tab"
               {...tabButtonProps(item)}
               onClick={() => select(item.id)}
+              title={labelsVisible ? undefined : item.label}
+              aria-label={labelsVisible ? undefined : item.label}
               className={cn(
                 'group relative pb-3 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-swan-400 focus-visible:ring-offset-2',
                 isActive
@@ -162,8 +189,15 @@ export function Tabs({
               )}
             >
               <span className="flex items-center gap-2">
-                {item.icon}
-                {item.label}
+                <span
+                  aria-hidden={labelsVisible ? undefined : true}
+                  className="inline-flex items-center"
+                >
+                  {item.icon}
+                </span>
+                <span className={labelsVisible ? undefined : 'sr-only'}>
+                  {item.label}
+                </span>
                 {item.badge}
               </span>
               <span
@@ -198,15 +232,25 @@ export function Tabs({
             role="tab"
             {...tabButtonProps(item)}
             onClick={() => select(item.id)}
+            title={labelsVisible ? undefined : item.label}
+            aria-label={labelsVisible ? undefined : item.label}
             className={cn(
-              'flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-swan-400 focus-visible:ring-offset-2',
+              'flex items-center gap-2 rounded-lg text-sm font-medium transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-swan-400 focus-visible:ring-offset-2',
+              labelsVisible ? 'px-4 py-2' : 'p-2',
               isActive
                 ? 'bg-gradient-to-r from-swan-500 to-swan-600 text-white shadow-sm'
                 : 'text-gray-500 hover:bg-gray-50/80 hover:text-gray-700',
             )}
           >
-            {item.icon}
-            {item.label}
+            <span
+              aria-hidden={labelsVisible ? undefined : true}
+              className="inline-flex items-center"
+            >
+              {item.icon}
+            </span>
+            <span className={labelsVisible ? undefined : 'sr-only'}>
+              {item.label}
+            </span>
             {item.badge}
           </button>
         );

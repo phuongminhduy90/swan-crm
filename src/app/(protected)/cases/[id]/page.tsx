@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
-  ArrowLeft, ChevronRight, AlertCircle, Edit2, User, Calendar,
+  ArrowLeft, ChevronRight, AlertCircle, Edit2, User, Users as UsersIcon, Calendar,
   FileText, Clock, Plus, Trash2, DollarSign, Briefcase,
-  Shield, Paperclip, Upload as UploadIcon,
+  Shield, Paperclip, Upload as UploadIcon, Info,
 } from 'lucide-react';
 import {
   getCustomer, getCase, getCaseServices, updateCase, updateCaseStatus,
@@ -24,6 +24,7 @@ import { Modal } from '@/components/ui/modal';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Tabs } from '@/components/ui/tabs';
 import { CaseStatusBadge } from '@/components/cases/status-badge';
 import { BillSummary } from '@/components/cases/bill-summary';
 import { PaymentList } from '@/components/payments/payment-list';
@@ -85,14 +86,14 @@ const PRIORITY_LABELS: Record<string, string> = {
   normal: 'Bình thường', high: 'Cao', urgent: 'Khẩn cấp',
 };
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'info', label: 'Thông tin' },
-  { id: 'services', label: 'Dịch vụ' },
-  { id: 'payments', label: 'Thanh toán' },
-  { id: 'staff', label: 'Phân công' },
-  { id: 'attachments', label: 'Đính kèm' },
-  { id: 'consents', label: 'Consent' },
-  { id: 'timeline', label: 'Timeline' },
+const TABS: { id: Tab; label: string; icon: ReactNode }[] = [
+  { id: 'info', label: 'Thông tin', icon: <Info className="h-4 w-4" /> },
+  { id: 'services', label: 'Dịch vụ', icon: <Briefcase className="h-4 w-4" /> },
+  { id: 'payments', label: 'Thanh toán', icon: <DollarSign className="h-4 w-4" /> },
+  { id: 'staff', label: 'Phân công', icon: <UsersIcon className="h-4 w-4" /> },
+  { id: 'attachments', label: 'Đính kèm', icon: <Paperclip className="h-4 w-4" /> },
+  { id: 'consents', label: 'Consent', icon: <Shield className="h-4 w-4" /> },
+  { id: 'timeline', label: 'Timeline', icon: <Clock className="h-4 w-4" /> },
 ];
 
 function InfoRow({ label, value, icon }: { label: string; value: React.ReactNode; icon?: React.ReactNode }) {
@@ -462,20 +463,21 @@ export default function CaseDetailPage() {
         <NextOwnerBanner nextOwner={nextOwner} resolvedName={resolvedOwner} />
       )}
 
-      <div className="flex gap-1 rounded-xl border border-gray-200 bg-white p-1 shadow-sm">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={cn(
-              'flex-1 rounded-lg py-2 text-sm font-medium transition-all',
-              activeTab === tab.id ? 'bg-swan-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700',
-            )}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {/* Story C.1.2 (Sprint 7.1) — migrate hand-rolled tabs to the shared
+          <Tabs> primitive with `iconOnly="auto"` so the tab row collapses to
+          icon-only on viewports < 640 px and shows icon + label on desktop.
+          `panelIds={[]}` opts out of `aria-controls` emission since the panel
+          ARIA wiring is the responsibility of Story C.1.3 (deferred to keep
+          blast radius isolated). The `idPrefix` keeps tab ids stable across
+          re-renders for future panel wiring. */}
+      <Tabs
+        items={TABS}
+        activeId={activeTab}
+        onChange={(id) => setActiveTab(id as Tab)}
+        idPrefix="case-detail-tab"
+        panelIds={[]}
+        iconOnly="auto"
+      />
 
       {activeTab === 'info' && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
