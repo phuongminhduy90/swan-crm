@@ -442,11 +442,18 @@ export default function CustomerDetailPage() {
         items={TABS}
         activeId={activeTab}
         onChange={setActiveTab}
+        idPrefix="customer-detail"
       />
 
       {/* ── Tab: Thông tin ────────────────────────────────────────────────── */}
       {activeTab === 'info' && (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div
+          id="customer-detail-panel-info"
+          role="tabpanel"
+          aria-labelledby="customer-detail-tab-info"
+          tabIndex={0}
+          className="grid grid-cols-1 gap-6 lg:grid-cols-2 outline-none"
+        >
           <Card>
             <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-swan-600">Thông tin cơ bản</h3>
             <InfoRow label="Họ tên" value={customer.fullName} icon={<User className="h-4 w-4" />} />
@@ -491,7 +498,13 @@ export default function CustomerDetailPage() {
 
       {/* ── Tab: Lịch sử ca ──────────────────────────────────────────────── */}
       {activeTab === 'cases' && (
-        <div className="space-y-3">
+        <div
+          id="customer-detail-panel-cases"
+          role="tabpanel"
+          aria-labelledby="customer-detail-tab-cases"
+          tabIndex={0}
+          className="space-y-3 outline-none"
+        >
           {casesLoading ? (
             <div className="flex min-h-40 items-center justify-center text-gray-400">
               <div className="h-6 w-6 animate-spin rounded-full border-2 border-swan-200 border-t-swan-500" />
@@ -536,7 +549,13 @@ export default function CustomerDetailPage() {
 
       {/* ── Tab: Theo dõi sau PT ──────────────────────────────────────────── */}
       {activeTab === 'followups' && (
-        <div className="space-y-3">
+        <div
+          id="customer-detail-panel-followups"
+          role="tabpanel"
+          aria-labelledby="customer-detail-tab-followups"
+          tabIndex={0}
+          className="space-y-3 outline-none"
+        >
           {followupsLoading ? (
             <div className="flex min-h-40 items-center justify-center text-gray-400">
               <Loader2 className="h-6 w-6 animate-spin text-swan-500" />
@@ -597,15 +616,30 @@ export default function CustomerDetailPage() {
 
       {/* ── Tab: Timeline ─────────────────────────────────────────────────── */}
       {activeTab === 'timeline' && (
+        <div
+          id="customer-detail-panel-timeline"
+          role="tabpanel"
+          aria-labelledby="customer-detail-tab-timeline"
+          tabIndex={0}
+          className="outline-none"
+        >
         <Card className="flex flex-col items-center justify-center py-16 text-gray-400">
           <Clock className="mb-3 h-10 w-10 opacity-30" />
           <p className="font-medium">Timeline đang phát triển</p>
           <p className="mt-1 text-sm">Tính năng này sẽ sớm ra mắt</p>
         </Card>
+        </div>
       )}
 
       {/* ── Tab: Consent ──────────────────────────────────────────────────── */}
       {activeTab === 'consents' && (
+        <div
+          id="customer-detail-panel-consents"
+          role="tabpanel"
+          aria-labelledby="customer-detail-tab-consents"
+          tabIndex={0}
+          className="outline-none"
+        >
         <Card className="p-6">
           <div className="mb-4 flex items-center gap-2">
             <Shield className="h-5 w-5 text-gray-500" />
@@ -616,6 +650,7 @@ export default function CustomerDetailPage() {
             canWrite={canWrite}
           />
         </Card>
+        </div>
       )}
 
       {/* ── Edit Modal ────────────────────────────────────────────────────── */}

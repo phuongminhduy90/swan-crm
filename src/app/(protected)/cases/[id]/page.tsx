@@ -466,21 +466,30 @@ export default function CaseDetailPage() {
       {/* Story C.1.2 (Sprint 7.1) — migrate hand-rolled tabs to the shared
           <Tabs> primitive with `iconOnly="auto"` so the tab row collapses to
           icon-only on viewports < 640 px and shows icon + label on desktop.
-          `panelIds={[]}` opts out of `aria-controls` emission since the panel
-          ARIA wiring is the responsibility of Story C.1.3 (deferred to keep
-          blast radius isolated). The `idPrefix` keeps tab ids stable across
-          re-renders for future panel wiring. */}
+          Story C.1.3 (Sprint 7.1) — `idPrefix="case-detail"` keeps tab ids
+          stable so each panel below can wire
+          `role="tabpanel"` + `id="case-detail-panel-{id}"` +
+          `aria-labelledby="case-detail-tab-{id}"` (the primitive injects
+          `-tab-` and `-panel-` between the prefix and the tab id). Omitting
+          `panelIds` lets the primitive emit `aria-controls` for every tab
+          (axe-core rejects dangling references, so every panel below MUST
+          stay reachable). */}
       <Tabs
         items={TABS}
         activeId={activeTab}
         onChange={(id) => setActiveTab(id as Tab)}
-        idPrefix="case-detail-tab"
-        panelIds={[]}
+        idPrefix="case-detail"
         iconOnly="auto"
       />
 
       {activeTab === 'info' && (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div
+          id="case-detail-panel-info"
+          role="tabpanel"
+          aria-labelledby="case-detail-tab-info"
+          tabIndex={0}
+          className="grid grid-cols-1 gap-6 lg:grid-cols-2 outline-none"
+        >
           <Card>
             <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-swan-600">Thông tin CASE</h3>
             <InfoRow label="Mã CA" value={caseRecord.caseCode} icon={<Briefcase className="h-4 w-4" />} />
@@ -623,7 +632,13 @@ export default function CaseDetailPage() {
       )}
 
       {activeTab === 'services' && (
-        <div className="space-y-4">
+        <div
+          id="case-detail-panel-services"
+          role="tabpanel"
+          aria-labelledby="case-detail-tab-services"
+          tabIndex={0}
+          className="space-y-4 outline-none"
+        >
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold text-gray-900">Dịch vụ ({activeServices.length})</h3>
             {canWrite && (
@@ -677,7 +692,13 @@ export default function CaseDetailPage() {
       )}
 
       {activeTab === 'payments' && (
-        <div className="space-y-4">
+        <div
+          id="case-detail-panel-payments"
+          role="tabpanel"
+          aria-labelledby="case-detail-tab-payments"
+          tabIndex={0}
+          className="space-y-4 outline-none"
+        >
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold text-gray-900">Thanh toán</h3>
             {canPaymentCreate && (
@@ -693,7 +714,13 @@ export default function CaseDetailPage() {
       )}
 
       {activeTab === 'staff' && (
-        <div className="space-y-4">
+        <div
+          id="case-detail-panel-staff"
+          role="tabpanel"
+          aria-labelledby="case-detail-tab-staff"
+          tabIndex={0}
+          className="space-y-4 outline-none"
+        >
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold text-gray-900">Phân công nhân sự</h3>
             {canWrite && (
@@ -730,14 +757,29 @@ export default function CaseDetailPage() {
       )}
 
       {activeTab === 'timeline' && (
+        <div
+          id="case-detail-panel-timeline"
+          role="tabpanel"
+          aria-labelledby="case-detail-tab-timeline"
+          tabIndex={0}
+          className="outline-none"
+        >
         <Card className="flex flex-col items-center justify-center py-16 text-gray-400">
           <Clock className="mb-3 h-10 w-10 opacity-30" />
           <p className="font-medium">Timeline đang phát triển</p>
           <p className="mt-1 text-sm">Tính năng này sẽ sớm ra mắt</p>
         </Card>
+        </div>
       )}
 
       {activeTab === 'attachments' && (
+        <div
+          id="case-detail-panel-attachments"
+          role="tabpanel"
+          aria-labelledby="case-detail-tab-attachments"
+          tabIndex={0}
+          className="outline-none"
+        >
         <Card className="p-6">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -761,9 +803,17 @@ export default function CaseDetailPage() {
             refreshKey={refreshKey}
           />
         </Card>
+        </div>
       )}
 
       {activeTab === 'consents' && (
+        <div
+          id="case-detail-panel-consents"
+          role="tabpanel"
+          aria-labelledby="case-detail-tab-consents"
+          tabIndex={0}
+          className="outline-none"
+        >
         <Card className="p-6">
           <div className="mb-4 flex items-center gap-2">
             <Shield className="h-5 w-5 text-gray-500" />
@@ -776,6 +826,7 @@ export default function CaseDetailPage() {
             refreshKey={refreshKey}
           />
         </Card>
+        </div>
       )}
 
       <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Chỉnh sửa hồ sơ CASE" description={`Cập nhật ${caseRecord.caseCode}`} size="lg" closeLabel="Đóng hộp thoại chỉnh sửa hồ sơ">

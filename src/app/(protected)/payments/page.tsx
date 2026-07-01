@@ -107,25 +107,44 @@ export default function PaymentsPage() {
 
       {/* Tabs */}
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div className="flex overflow-x-auto border-b border-gray-100">
-          {TABS.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={cn(
-                'flex shrink-0 items-center gap-2 border-b-2 px-5 py-3.5 text-sm font-medium transition-colors',
-                activeTab === tab.key
-                  ? 'border-swan-500 text-swan-700'
-                  : 'border-transparent text-gray-500 hover:text-gray-700',
-              )}
-            >
-              {tab.icon}
-              {tab.label}
-            </button>
-          ))}
+        <div
+          role="tablist"
+          aria-orientation="horizontal"
+          aria-label="Bộ lọc trạng thái thanh toán"
+          className="flex overflow-x-auto border-b border-gray-100"
+        >
+          {TABS.map((tab) => {
+            const isActive = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                role="tab"
+                id={`payments-tab-${tab.key}`}
+                aria-selected={isActive}
+                aria-controls={`payments-tab-panel-${tab.key}`}
+                tabIndex={isActive ? 0 : -1}
+                onClick={() => setActiveTab(tab.key)}
+                className={cn(
+                  'flex shrink-0 items-center gap-2 border-b-2 px-5 py-3.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-swan-400 focus-visible:ring-offset-2',
+                  isActive
+                    ? 'border-swan-500 text-swan-700'
+                    : 'border-transparent text-gray-500 hover:text-gray-700',
+                )}
+              >
+                {tab.icon}
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
 
-        <div className="p-4">
+        <div
+          id={`payments-tab-panel-${activeTab}`}
+          role="tabpanel"
+          aria-labelledby={`payments-tab-${activeTab}`}
+          tabIndex={0}
+          className="p-4 outline-none"
+        >
           {activeTab === 'refund' ? (
             <PaymentList key={listKey} paymentTypeFilter="refund" refresh={refresh} />
           ) : (

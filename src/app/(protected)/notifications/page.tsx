@@ -175,25 +175,46 @@ export default function NotificationsPage() {
         activeId={filter}
         onChange={(id) => setFilter(id as FilterTab)}
         variant="pill"
+        idPrefix="notifications"
       />
 
       {loading ? (
-        <div className="flex items-center justify-center py-12">
+        <div
+          id={`notifications-panel-${filter}`}
+          role="tabpanel"
+          aria-labelledby={`notifications-tab-${filter}`}
+          tabIndex={0}
+          className="flex items-center justify-center py-12 outline-none"
+        >
           <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
         </div>
       ) : filtered.length === 0 ? (
-        <Card className="p-12 text-center">
-          <Bell className="mx-auto h-12 w-12 text-gray-300" />
-          <p className="mt-4 text-sm font-medium text-gray-900">
-            {filter === 'unread'
-              ? 'Không có thông báo chưa đọc'
-              : filter === 'read'
-              ? 'Chưa có thông báo đã đọc'
-              : 'Chưa có thông báo nào'}
-          </p>
-        </Card>
+        <div
+          id={`notifications-panel-${filter}`}
+          role="tabpanel"
+          aria-labelledby={`notifications-tab-${filter}`}
+          tabIndex={0}
+          className="outline-none"
+        >
+          <Card className="p-12 text-center">
+            <Bell className="mx-auto h-12 w-12 text-gray-300" />
+            <p className="mt-4 text-sm font-medium text-gray-900">
+              {filter === 'unread'
+                ? 'Không có thông báo chưa đọc'
+                : filter === 'read'
+                ? 'Chưa có thông báo đã đọc'
+                : 'Chưa có thông báo nào'}
+            </p>
+          </Card>
+        </div>
       ) : (
-        <div className="space-y-2">
+        <div
+          id={`notifications-panel-${filter}`}
+          role="tabpanel"
+          aria-labelledby={`notifications-tab-${filter}`}
+          tabIndex={0}
+          className="space-y-2 outline-none"
+        >
           {filtered.map((n) => {
             const Icon = EVENT_ICONS[n.eventType] ?? Bell;
             const isUnread = !n.readBy?.includes(currentUserId);

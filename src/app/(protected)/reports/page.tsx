@@ -72,10 +72,17 @@ export default function ReportsPage() {
         ]}
         activeId={tabId}
         onChange={setTabId}
+        idPrefix="reports"
       />
 
       {/* Content */}
-      <div className={cn('animate-fade-in')}>
+      <div
+        id={`reports-panel-${tabId}`}
+        role="tabpanel"
+        aria-labelledby={`reports-tab-${tabId}`}
+        tabIndex={0}
+        className={cn('animate-fade-in outline-none')}
+      >
         {loading ? (
           <div className="space-y-6">
             <StatCardsSkeleton />
