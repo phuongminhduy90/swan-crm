@@ -157,7 +157,123 @@ git commit --no-verify -m "fix: hotfix production"
 
 ---
 
-## 3. Legacy commits
+## 3. Anti-pattern pre-commit guard (TD-6)
+
+Toàn bộ commit — kể từ Sprint 7.1 close — phải vượt qua
+[`scripts/check-anti-patterns.sh`](scripts/check-anti-patterns.sh) trước khi được ghi lịch sử.
+
+### 3.1 Anti-pattern catalog
+
+Script kiểm tra **4 nhóm** anti-pattern (đã đóng ở Sprint 6.x, kẻ cũ tái xâm nhập = regression):
+
+| ID  | Mô tả                                | Regex                                          | Phạm vi           |
+|:----|:-------------------------------------|:-----------------------------------------------|:------------------|
+| A2  | Raw `user-*` IDs trong UI            | `user-\d{3}`                                   | `src/components`  |
+| A8  | Dead `href="#"` links                | `href=["']#["']`                               | `src/components`  |
+| A9  | Native `window.confirm` / `alert`    | `window\.(confirm\|alert)\s*\(`                | `src`             |
+| ESC | `eslint-disable` cho `no-alert`      | `eslint-disable[^"']*no-alert`                 | `src`             |
+
+**Ngoại lệ:** comment-only line (`// ...`, `/* ... */`, `* ...`) được bỏ qua để tránh false-positive trên docs/documentation comments — ví dụ `// thay thế window.alert bằng <Toast>` không trigger.
+
+**Ngoại lệ khác:** `__tests__/`, `*.test.*`, `*.spec.*`, `.next/`, `node_modules/`, `playwright-report/`.
+
+### 3.2 Chạy thủ công
+
+```bash
+# Quét STAGED files — đây là mode `pre-commit` hook sử dụng
+bash scripts/check-anti-patterns.sh --staged   # mặc định cũng vậy
+
+# Quét TOÀN BỘ source tree — cho CI / audit định kỳ / annual sweep
+bash scripts/check-anti-patterns.sh --all
+
+# Trợ giúp
+bash scripts/check-anti-patterns.sh --help
+```
+
+**Exit codes:**
+- `0` — clean (không có vi phạm)
+- `1` — có ít nhất 1 match; output liệt kê `<ID>: <file>:<line>` cho từng vi phạm
+- `2` — sai argument hoặc không có git work tree
+
+**Output ví dụ (deliberate violation):**
+
+```
+TD-6 anti-pattern gate — mode: all (full source tree)
+─────────────────────────────────────────────────────────────
+[A9] native window.confirm / window.alert
+    src/components/__td6_smoke.tsx:9:  if (window.confirm("really delete?")) {
+
+TD-6: 1 anti-pattern match(es) detected.
+```
+
+### 3.3 Wiring (tùy chọn — chọn 1 trong 3)
+
+Project hiện **CHƯA** adopt Husky để giữ footprint nhỏ (TD-6 = lightweight theo Sprint 7.1 §0).
+Ba cách dưới nếu muốn enforce tự động:
+
+**Cách A — `core.hooksPath` (khuyến nghị, 0 dependency):**
+
+```bash
+git config core.hooksPath .githooks
+# (.githooks/pre-commit đã có sẵn trong repo, invoke scripts/check-anti-patterns.sh)
+```
+
+**Cách B — copy trực tiếp vào `.git/hooks/`:**
+
+```bash
+cp .githooks/pre-commit .git/hooks/pre-commit
+chmod +x .git/hooks/pre-commit
+```
+
+**Cách C — CI pipeline (chạy trên mọi PR):**
+
+```yaml
+# .github/workflows/anti-pattern.yml (snippet)
+- name: TD-6 anti-pattern gate (--all mode)
+  run: |
+    bash scripts/check-anti-patterns.sh --all \
+      || { echo "Anti-pattern regression found"; exit 1; }
+```
+
+### 3.4 Bypass — `--no-verify`
+
+Khi hook đã wired, có thể bypass cho hotfix khẩn cấp:
+
+```bash
+git commit --no-verify -m "fix(payments): hotfix production"
+```
+
+**Chính sách bypass (giống TD-1 §2.4):**
+- Chỉ dùng cho hotfix P0/P1 trên production.
+- Bypass chỉ tắt hook — anti-pattern vẫn tồn tại trong code; fix ở commit kế tiếp.
+- Mỗi bypass phải được review trong PR + ghi chú trong PR description.
+
+### 3.5 Khi anti-pattern được phát hiện
+
+1. **Đọc pattern ID + file:line** trong output của script.
+2. **Sửa tại nguồn** (đây là regression của Sprint 6.x closures):
+   - A9 → dùng `<Toast>` / `<ConfirmDialog>` từ `@/components/ui/`.
+   - A8 → dùng `<button onClick={...}>` thay cho `<a href="#">` hoặc dùng routing helper.
+   - A2 → lấy `displayName` từ user profile, không hard-code `user-NNN`.
+   - ESC → xóa comment `eslint-disable no-alert` — anti-pattern A9 đã đóng, không cần escape.
+3. Re-stage + commit bình thường.
+
+Nếu match nằm trong comment văn bản (không phải code), đổi cách diễn đạt để không còn khớp regex
+(ví dụ: viết `window . alert` có khoảng trắng, hoặc dùng `[w]indow.alert`).
+
+### 3.6 Tại sao lightweight (không dùng Husky / lint-staged)
+
+- **0 dependency** — không tăng `package.json`, không phụ thuộc Node version.
+- **Tách biệt khỏi npm scripts** — dev có thể chạy ngay cả khi `node_modules/` chưa install.
+- **CI-friendly** — `bash scripts/check-anti-patterns.sh --all` chạy thẳng trong GitHub Actions / Vercel.
+- **Dễ debug** — output giản dị (ID + file:line), không cần đọc qua JSON / hooks config.
+
+Khi nào nên adopt Husky: nếu Sprint sau muốn 5+ pre-commit hooks (lint-staged, typecheck, format,
+i18n key audit, etc.) — khi đó `husky` + `lint-staged` sẽ cân nhắc lại trong một TD-7+ tech debt item.
+
+---
+
+## 4. Legacy commits
 
 Tất cả commit trước Sprint 7.1 (vd: `update`, `Create SPRINT_*.md`, `migration note 6_3_3`) **được giữ nguyên** — không rewrite git history. Conventional Commits chỉ áp dụng từ Sprint 7.1 close-out trở đi.
 
@@ -165,20 +281,21 @@ Nếu cần tra cứu sprint/story của một commit cũ, dùng `git log --grep
 
 ---
 
-## 4. Definition of Done (story-level)
+## 5. Definition of Done (story-level)
 
 Mỗi story trước khi handoff phải đạt:
 
 - [ ] **Acceptance criteria** — mọi checkbox trong `STORY_*_EXECUTION_PLAN.md` được tick
 - [ ] **Build + quality** — `npm run lint`, `npm run typecheck`, `npm run build` đều xanh
 - [ ] **Tests** — `npm test` pass + thêm test cho behavior mới
-- [ ] **Anti-pattern grep** — `bash scripts/check-anti-patterns.sh` (TD-6, sẽ land trong Sprint 7.1) exit 0
-- [ ] **Commit subject** — tuân convention §1
+- [ ] **Anti-pattern grep** — `bash scripts/check-anti-patterns.sh` exit 0
+      (TD-6 §3 — quét `--all` cho audit, `--staged` cho commit; xem §3.2)
+- [ ] **Commit subject** — tuân convention §1 (TD-1)
 - [ ] **Docs** — `STORY_*_IMPLEMENTATION_REPORT.md` + `STORY_*_MIGRATION_NOTES.md` cập nhật
 
 ---
 
-## 5. Liên hệ / câu hỏi
+## 6. Liên hệ / câu hỏi
 
 - **Tech debt backlog:** [`docs/ux-redesign/IMPLEMENTATION_BACKLOG.md`](docs/ux-redesign/IMPLEMENTATION_BACKLOG.md)
 - **Sprint 7.1 plan:** [`docs/ux-redesign/SPRINT_7_1_EXECUTION_PLAN.md`](docs/ux-redesign/SPRINT_7_1_EXECUTION_PLAN.md)

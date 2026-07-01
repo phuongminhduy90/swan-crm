@@ -543,6 +543,18 @@ function seedCases(): void {
       salesNote: 'Quan tâm Ergo 2.', privacyLevel: 'normal',
       createdBy: 'user-005', createdAt: day(1), updatedAt: day(1),
     },
+    // Case 21: TD-4 — additional cancelled case (Sprint 7.1). Diversifies
+    // the cancelled-status distribution beyond the single case-012 seed.
+    // Customer cus-013 is reusing for a second, now-cancelled, attempt.
+    {
+      id: 'case-021', caseCode: 'SW-260630-001', customerId: 'cus-013', caseDate: day(60),
+      mainServiceGroup: 'body', status: 'cancelled', priority: 'normal',
+      totalBillBeforeDiscount: 18000000, discountType: 'none',
+      totalBillAfterDiscount: 18000000, amountPaid: 3000000, remainingAmount: 15000000, paymentStatus: 'deposit',
+      salesNote: 'Khách hủy vì lý do tài chính — đã thông báo trước PT 2 ngày.',
+      privacyLevel: 'vip',
+      createdBy: 'user-005', createdAt: day(60), updatedAt: day(30),
+    },
   ];
   for (const c of cases) col.set(c.id, c as Record<string, unknown>);
 }
@@ -614,6 +626,15 @@ function seedPayments(): void {
     { id: 'pay-021', caseId: 'case-015', customerId: 'cus-015', amount: 22750000, paymentMethod: 'installment', paymentType: 'partial', paymentDate: day(8), status: 'pending', createdBy: 'user-006', createdAt: day(8), updatedAt: day(8) },
     { id: 'pay-022', caseId: 'case-001', customerId: 'cus-001', amount: 5000000, paymentMethod: 'other', paymentType: 'deposit', paymentDate: day(30), status: 'pending', createdBy: 'user-004', createdAt: day(30), updatedAt: day(30) },
     { id: 'pay-023', caseId: 'case-009', customerId: 'cus-009', amount: 15000000, paymentMethod: 'bank_transfer', paymentType: 'partial', paymentDate: day(3), status: 'pending', createdBy: 'user-006', createdAt: day(3), updatedAt: day(3) },
+
+    // ── TD-4: refund payment expansion (Sprint 7.1) ────────────
+    // Two additional refund payments in distinct months so the refund
+    // segment on the Reports → Revenue tab pie/line chart becomes
+    // non-degenerate (target ≥ 3 refund payments, deterministically spread).
+    // - pay-024: refund of deposit for cancelled case-012 (older month).
+    // - pay-025: partial goodwill refund for complaint case-019 (recent month).
+    { id: 'pay-024', caseId: 'case-012', customerId: 'cus-012', amount: 5000000, paymentMethod: 'cash', paymentType: 'refund', paymentDate: month(4), status: 'confirmed', confirmedBy: 'user-007', confirmedAt: month(4), note: 'Hoàn lại tiền cọc do khách hủy ca', createdBy: 'user-007', createdAt: month(4), updatedAt: month(4) },
+    { id: 'pay-025', caseId: 'case-019', customerId: 'cus-019', amount: 3000000, paymentMethod: 'bank_transfer', paymentType: 'refund', paymentDate: month(1), status: 'confirmed', confirmedBy: 'user-007', confirmedAt: month(1), note: 'Hoàn tiền một phần xử lý khiếu nại', createdBy: 'user-007', createdAt: month(1), updatedAt: month(1) },
   ];
   for (const p of payments) col.set(p.id, p as Record<string, unknown>);
 }

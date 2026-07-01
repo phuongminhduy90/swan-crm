@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# .githooks/pre-commit
+#
+# TD-6 — Anti-pattern pre-commit guard.
+#
+# Scans staged files for known anti-pattern regressions before allowing commit.
+# Invoke: git commit → .git calls this hook automatically.
+# Bypass: git commit --no-verify (hotfix P0/P1 only).
+
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null | tr -d '\r')"
+HOOK_PATH="${REPO_ROOT}/scripts/check-anti-patterns.sh"
+
+if [[ ! -x "${HOOK_PATH}" ]]; then
+  echo "TD-6: ${HOOK_PATH} not found or not executable." >&2
+  echo "      Wire it: git config core.hooksPath .githooks" >&2
+  exit 1
+fi
+
+exec bash "${HOOK_PATH}" --staged
