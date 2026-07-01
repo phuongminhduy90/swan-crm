@@ -495,6 +495,33 @@ Always `@/...` alias, never relative `../../../`.
 - Domain helpers gọi generic helpers trong `@/lib/firebase/firestore.ts`
 - Generic helpers auto-route giữa Firebase thật và mock store
 
+### Conventional Commits (TD-1, Sprint 7.1)
+
+From Sprint 7.1 close-out, **all commit subjects must follow** [Conventional Commits 1.0.0](https://www.conventionalcommits.org/):
+
+```
+<type>(<scope>)?!?: <mô tả ngắn>
+```
+
+**9 allowed types:** `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, `perf`, `build`, `ci`
+
+**Scope** (optional): lowercase + digits + dash. Examples: `case-detail`, `payments`, `toast`, `api`.
+
+**Breaking change:** add `!` after type/scope + `BREAKING CHANGE:` in body.
+
+**Validator:** `bash scripts/check-commit-msg.sh` (bash, no Husky dependency).
+
+**Bypass:** `git commit --no-verify` — allowed for P0/P1 hotfixes only. Subject must still follow convention.
+
+**Wiring (pick one):**
+- `git config core.hooksPath .githooks` → hooks tracked in repo (recommended)
+- `cp scripts/check-commit-msg.sh .git/hooks/commit-msg`
+- CI pipeline (GitHub Actions job, see CONTRIBUTING.md §2.3)
+
+Full guide: [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+> **Legacy commits preserved:** all commits before Sprint 7.1 (`update`, `Create SPRINT_*`, etc.) are NOT rewritten. Conventional Commits applies from Sprint 7.1 onward.
+
 ### Audit logging
 
 Use `writeAuditLog()` from `@/lib/firestore/audit` for all user actions. AuditAction type in `@/lib/types/audit.ts`.
