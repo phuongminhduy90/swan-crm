@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   FileText, ChevronDown, ChevronRight, Loader2, UserPlus, Edit,
   FolderPlus, ArrowRightLeft, DollarSign, Upload, Shield,
-  Users, CheckCircle2, Trash2, AlertTriangle, FilePlus,
+  Users, CheckCircle2, Trash2, AlertTriangle, FilePlus, Undo2, RefreshCw,
 } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import { Card } from '@/components/ui/card';
@@ -87,6 +87,13 @@ const AUDIT_ACTION_LABELS: Record<AuditAction, { label: string; icon: React.Elem
   payment_created: { label: 'Tạo thanh toán', icon: DollarSign, color: 'text-emerald-600 bg-emerald-50' },
   payment_confirmed: { label: 'Xác nhận thanh toán', icon: CheckCircle2, color: 'text-emerald-600 bg-emerald-50' },
   payment_rejected: { label: 'Từ chối thanh toán', icon: AlertTriangle, color: 'text-red-600 bg-red-50' },
+  /**
+   * Story PI-2 (Sprint 7.2) — a refund payment was created against an
+   * original confirmed payment. The audit entry is attached to the ORIGINAL
+   * payment (entityId = originalPaymentId) so auditors can trace refund
+   * chains directly from the original payment's audit history.
+   */
+  payment_refunded: { label: 'Hoàn tiền', icon: Undo2, color: 'text-amber-600 bg-amber-50' },
   attachment_uploaded: { label: 'Upload file', icon: Upload, color: 'text-swan-600 bg-swan-50' },
   attachment_deleted: { label: 'Xóa file đính kèm', icon: Trash2, color: 'text-red-600 bg-red-50' },
   attachment_visibility_changed: { label: 'Đổi quyền xem file', icon: Shield, color: 'text-purple-600 bg-purple-50' },
@@ -105,6 +112,14 @@ const AUDIT_ACTION_LABELS: Record<AuditAction, { label: string; icon: React.Elem
    * would not blank. Investigate the data shape that triggered it.
    */
   dashboard_render_fallback: { label: 'Dashboard render fallback', icon: AlertTriangle, color: 'text-orange-600 bg-orange-50' },
+  /**
+   * Story F-HIGH-28 (Sprint 7.2) — case bill totals were recomputed from
+   * the source-of-truth service list + payment history. The `after` payload
+   * carries the trigger (service_added | service_removed | service_updated)
+   * and the resulting snapshot (amountPaid, refundedAmount, remainingAmount,
+   * paymentStatus, totalBillAfterDiscount, billHash).
+   */
+  bill_recomputed: { label: 'Đồng bộ hóa bill', icon: RefreshCw, color: 'text-swan-600 bg-swan-50' },
 };
 
 const ENTITY_TYPE_LABELS: Record<AuditEntityType | 'all', string> = {

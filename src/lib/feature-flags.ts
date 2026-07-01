@@ -27,7 +27,8 @@ export type FeatureFlag =
   | 'CLINICAL_CHECKLIST' // Story B.2.1 — UI: render 6 clinical items
   | 'CHECKLIST_GATE' // Story B.2.1 — server + UI: enforce allPassed on gated transitions
   | 'MINH_SCREEN' // Story B.4.1 — Replace h-screen with min-h-screen to fix iOS Safari URL-bar overlap
-  | 'BILL_RECOMPUTE'; // Story PI-1 (Sprint 7.2) — Render the bill-recompute indicator chip next to "Tổng bill" on case detail
+  | 'BILL_RECOMPUTE' // Story PI-1 (Sprint 7.2) — Render the bill-recompute indicator chip next to "Tổng bill" on case detail
+  | 'PAYMENT_TX'; // Story PI-2 (Sprint 7.2) — Refund flow endpoint + UI button. Distinct from PAYMENT_SOD (which blocks same-user create+confirm). Both coexist.
 
 const ENV_PREFIX = 'NEXT_PUBLIC_FEATURE_';
 

@@ -135,3 +135,31 @@ export const DELETE_APPROVE_ROLES: UserRole[] = [
   'cso',
   'ceo',
 ];
+
+/**
+ * Story PI-2 (Sprint 7.2) — Who can create a refund payment.
+ *
+ * Refund creation is a financial write: a separate Payment record with
+ * `paymentType: 'refund'` is appended and the case bill is recomputed.
+ * Three roles can do this:
+ *   - `admin`     — full financial authority
+ *   - `ceo`       — oversight + audit visibility
+ *   - `accountant` — owns daily reconciliation; refunds are a core
+ *                    accountant task (matches Vietnamese clinic accounting
+ *                    practice — refunds are distinct transactions, not
+ *                    negations).
+ *
+ * Additionally, the **creator of the original payment** can refund their own
+ * entry — this is enforced at runtime inside the API route (not encoded in
+ * this constant) so we don't accidentally widen the static list to every
+ * role that has `payments:write`. Sales can create payments but should NOT
+ * create refunds against them without management involvement.
+ *
+ * Production rollout is gated by `FEATURE_PAYMENT_TX` (default OFF) per the
+ * Sprint 7.2 plan §0.3 D7.2-5.
+ */
+export const REFUND_CREATE_ROLES: UserRole[] = [
+  'admin',
+  'ceo',
+  'accountant',
+];

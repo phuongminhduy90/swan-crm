@@ -16,8 +16,10 @@ import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PaymentConfirmDialog } from './payment-confirm-dialog';
-import { PAYMENT_CONFIRM_ROLES } from '@/constants/permissions';
+import { PaymentRefundDialog } from './payment-refund-dialog';
+import { PAYMENT_CONFIRM_ROLES, REFUND_CREATE_ROLES } from '@/constants/permissions';
 import { isFlagEnabled } from '@/lib/feature-flags';
+import { sumRefundsAgainst } from '@/lib/payments/refund';
 
 const PAYMENT_TYPE_LABELS: Record<string, string> = {
   deposit: 'Đặt cọc',
@@ -47,6 +49,7 @@ export function PaymentList({ caseId, statusFilter, paymentTypeFilter, refresh }
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [confirmingPayment, setConfirmingPayment] = useState<Payment | null>(null);
+  const [refundingPayment, setRefundingPayment] = useState<Payment | null>(null);
   // Story 6.3.3 / B.4.3 (F-HIGH-17): resolve createdBy / receivedBy /
   // confirmedBy user IDs to display names (closes A2 anti-pattern: raw
   // `user-XXX` IDs in payment list copy).
@@ -65,6 +68,11 @@ export function PaymentList({ caseId, statusFilter, paymentTypeFilter, refresh }
   // button for rows the current user created. The server returns 403 in
   // that case anyway, but hiding it improves UX (no rejected click).
   const sodEnabled = isFlagEnabled('PAYMENT_SOD');
+
+  // Story PI-2 (Sprint 7.2): refund feature flag. When OFF, the "Hoàn tiền"
+  // button is hidden — refunds must go through the manual create-payment
+  // path (matching the rollback plan in §7.1 of the Sprint 7.2 plan).
+  const refundFlagOn = isFlagEnabled('PAYMENT_TX');
 
   // Story 6.3.3 / B.4.3: build a Map<userId, displayName> once, instead of
   // scanning the array on every row render. Falls back to the original ID
@@ -216,6 +224,42 @@ export function PaymentList({ caseId, statusFilter, paymentTypeFilter, refresh }
             key: 'actions',
             header: 'Thao tác',
             render: (row: Payment) => {
+              // Story PI-2: confirmed non-refund rows get a "Hoàn tiền" button
+              // (when the PAYMENT_TX flag is on AND the caller has refund
+              // permission). Pending rows get the existing "Xử lý" button.
+              // Other rows (rejected / already-refund) show "—".
+              const canShowRefund =
+                refundFlagOn &&
+                row.status === 'confirmed' &&
+                row.paymentType !== 'refund' &&
+                (REFUND_CREATE_ROLES.includes(
+                  userProfile?.role as (typeof REFUND_CREATE_ROLES)[number],
+                ) ||
+                  row.createdBy === userProfile?.id);
+
+              const refundRemaining = Math.max(
+                0,
+                row.amount - sumRefundsAgainst(row.id, payments),
+              );
+
+              if (canShowRefund && refundRemaining > 0) {
+                return (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setRefundingPayment(row);
+                      }}
+                    >
+                      <RefreshCw className="h-3 w-3" />
+                      Hoàn tiền
+                    </Button>
+                  </div>
+                );
+              }
+
               if (row.status !== 'pending') {
                 return <span className="text-xs text-gray-400">—</span>;
               }
@@ -280,6 +324,15 @@ export function PaymentList({ caseId, statusFilter, paymentTypeFilter, refresh }
           onConfirm={handleConfirm}
           onReject={handleReject}
           onClose={() => setConfirmingPayment(null)}
+        />
+      )}
+
+      {refundingPayment && (
+        <PaymentRefundDialog
+          payment={refundingPayment}
+          existingRefundTotal={sumRefundsAgainst(refundingPayment.id, payments)}
+          onRefunded={load}
+          onClose={() => setRefundingPayment(null)}
         />
       )}
     </>

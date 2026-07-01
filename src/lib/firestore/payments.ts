@@ -6,6 +6,12 @@ import {
   getAllDocuments,
 } from '@/lib/firebase/firestore';
 import { updateCase } from './cases';
+import { isFlagEnabled } from '@/lib/feature-flags';
+import {
+  recomputeBillFromPayments,
+  snapshotToCaseUpdate,
+  type BillSnapshot,
+} from '@/lib/billing/recompute';
 
 const COLLECTION = 'payments';
 
@@ -98,8 +104,54 @@ export async function rejectPayment(
   await recalculateCasePayment(payment.caseId, updatedBy);
 }
 
-async function recalculateCasePayment(caseId: string, updatedBy: string): Promise<void> {
+/**
+ * Recalculate `case.amountPaid`, `case.remainingAmount` and `case.paymentStatus`
+ * from the full payment history of the case.
+ *
+ * Story F-HIGH-28 (Sprint 7.2): this function now delegates to a **pure**
+ * recompute (`recomputeBillFromPayments`) when `NEXT_PUBLIC_FEATURE_BILL_RECOMPUTE`
+ * is enabled, so bill totals are aggregated from the source-of-truth payment
+ * list every time (no incremental drift). When the flag is OFF, the legacy
+ * inline incremental path is preserved exactly as in Sprint 6.4 — refund /
+ * confirm / reject behaviour is unchanged.
+ *
+ * Behavior (post-F-HIGH-28):
+ * - `amountPaid` = Σ confirmed non-refund payments, clamped at 0.
+ * - `refundedAmount` = Σ confirmed refund payments, clamped at 0.
+ * - `remainingAmount = max(0, totalBillAfterDiscount - amountPaid + refundedAmount)`
+ *   — clamped at 0 because a negative "remaining" would mean the clinic owes
+ *   the customer, which is the refund workflow (handled by refund payments,
+ *   not by negative remaining).
+ * - `paymentStatus` is derived from `amountPaid`, the deposit presence and
+ *   `totalBillAfterDiscount` (`refunded` | `paid` | `deposit` | `partial` | `unpaid`).
+ *
+ * Story PI-2 (Sprint 7.2): the refund flow (`createRefund`) calls this helper
+ * after persisting the refund Payment, so the case totals reflect the new
+ * state immediately.
+ */
+export async function recalculateCasePayment(caseId: string, updatedBy: string): Promise<void> {
   const payments = await getPaymentsByCase(caseId);
+
+  const { getCase } = await import('./cases');
+  const caseRecord = await getCase(caseId);
+  if (!caseRecord) return;
+
+  if (isFlagEnabled('BILL_RECOMPUTE')) {
+    // Pure recompute path — source-of-truth aggregation (Sprint 7.2 §5.2).
+    const snapshot: BillSnapshot = recomputeBillFromPayments({
+      caseRecord: {
+        id: caseRecord.id,
+        totalBillAfterDiscount: caseRecord.totalBillAfterDiscount,
+      },
+      payments,
+    });
+    await updateCase(caseId, snapshotToCaseUpdate(snapshot), updatedBy);
+    return;
+  }
+
+  // ── Legacy incremental path (pre-F-HIGH-28 behaviour) ──────────────
+  // Preserved so production runs identical to Sprint 6.4 until the
+  // accountant-led C-7 pairing session signs off and flips the flag.
   const confirmedPayments = payments.filter((p) => p.status === 'confirmed');
 
   let amountPaid = 0;
@@ -110,11 +162,6 @@ async function recalculateCasePayment(caseId: string, updatedBy: string): Promis
       amountPaid += p.amount;
     }
   }
-
-  // We'd need to get the case to compute remainingAmount
-  const { getCase } = await import('./cases');
-  const caseRecord = await getCase(caseId);
-  if (!caseRecord) return;
 
   const remainingAmount = Math.max(0, caseRecord.totalBillAfterDiscount - amountPaid);
   let paymentStatus: 'unpaid' | 'deposit' | 'partial' | 'paid' | 'refunded' = 'unpaid';
