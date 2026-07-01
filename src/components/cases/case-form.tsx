@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { CurrencyInput } from '@/components/ui/currency-input';
 import {
   SERVICE_CATEGORY_LABELS,
   SERVICE_CATEGORY_COLORS,
@@ -323,6 +324,7 @@ export function CaseForm({ initialData, initialServices, mode = 'create', onSubm
 
   const {
     register,
+    control,
     handleSubmit,
     setValue,
     watch,
@@ -619,14 +621,19 @@ export function CaseForm({ initialData, initialServices, mode = 'create', onSubm
             </div>
             {watchDiscount && watchDiscount !== 'none' && watchDiscount !== 'gift' && (
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">
-                  Giá trị {watchDiscount === 'percent' ? '(%)' : '(VNĐ)'}
-                </label>
-                <input
-                  type="number"
-                  {...register('discountValue', { valueAsNumber: true })}
-                  min={0}
-                  className="h-9 w-full rounded-lg border border-gray-300 bg-white px-2 text-sm focus:border-swan-500 focus:outline-none"
+                <Controller
+                  control={control}
+                  name="discountValue"
+                  render={({ field, fieldState }) => (
+                    <CurrencyInput
+                      label={`Giá trị ${watchDiscount === 'percent' ? '(%)' : '(VNĐ)'}`}
+                      value={typeof field.value === 'number' ? field.value : 0}
+                      onChange={(num) => field.onChange(num)}
+                      onBlur={field.onBlur}
+                      error={fieldState.error?.message}
+                      className="h-9"
+                    />
+                  )}
                 />
               </div>
             )}
@@ -646,13 +653,23 @@ export function CaseForm({ initialData, initialServices, mode = 'create', onSubm
             <span className="text-gray-900">{formatCurrency(watchBillAfter ?? 0)}</span>
           </div>
 
-          <div className="flex justify-between text-sm">
-            <label className="text-gray-600 font-medium">Đặt cọc ngay</label>
-            <input
-              type="number"
-              {...register('amountPaid', { valueAsNumber: true })}
-              min={0}
-              className="h-8 w-36 rounded-lg border border-gray-300 bg-white px-2 text-right text-sm focus:border-swan-500 focus:outline-none"
+          <div className="flex justify-between items-center text-sm gap-3">
+            <label htmlFor="amountPaid-input" className="text-gray-600 font-medium shrink-0">
+              Đặt cọc ngay
+            </label>
+            <Controller
+              control={control}
+              name="amountPaid"
+              render={({ field, fieldState }) => (
+                <CurrencyInput
+                  id="amountPaid-input"
+                  value={typeof field.value === 'number' ? field.value : 0}
+                  onChange={(num) => field.onChange(num)}
+                  onBlur={field.onBlur}
+                  error={fieldState.error?.message}
+                  className="h-9 w-44 text-right"
+                />
+              )}
             />
           </div>
 

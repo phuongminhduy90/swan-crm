@@ -1,11 +1,12 @@
 'use client';
 
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createPaymentSchema, CreatePaymentFormValues } from '@/lib/validators/payment';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { CurrencyInput } from '@/components/ui/currency-input';
 import { Button } from '@/components/ui/button';
 
 interface Props {
@@ -18,6 +19,7 @@ interface Props {
 export function PaymentForm({ caseId, customerId, onSubmit, onClose }: Props) {
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<CreatePaymentFormValues>({
@@ -25,6 +27,7 @@ export function PaymentForm({ caseId, customerId, onSubmit, onClose }: Props) {
     defaultValues: {
       caseId,
       customerId,
+      amount: 0,
       paymentMethod: 'cash',
       paymentType: 'deposit',
       paymentDate: new Date().toISOString().slice(0, 10),
@@ -41,15 +44,21 @@ export function PaymentForm({ caseId, customerId, onSubmit, onClose }: Props) {
       <input type="hidden" {...register('caseId')} />
       <input type="hidden" {...register('customerId')} />
 
-      {/* Amount */}
-      <Input
-        label="Số tiền (VNĐ) *"
-        type="number"
-        min={1}
-        step={1000}
-        placeholder="Ví dụ: 5000000"
-        error={errors.amount?.message}
-        {...register('amount', { valueAsNumber: true })}
+      {/* Amount — CurrencyInput (Story C.2.1) */}
+      <Controller
+        control={control}
+        name="amount"
+        render={({ field, fieldState }) => (
+          <CurrencyInput
+            label="Số tiền (VNĐ) *"
+            value={typeof field.value === 'number' ? field.value : 0}
+            onChange={(num) => field.onChange(num)}
+            onBlur={field.onBlur}
+            placeholder="0"
+            error={fieldState.error?.message}
+            required
+          />
+        )}
       />
 
       <div className="grid grid-cols-2 gap-4">
