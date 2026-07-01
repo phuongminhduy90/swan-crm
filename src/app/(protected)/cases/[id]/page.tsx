@@ -49,6 +49,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { cn } from '@/lib/utils/cn';
+import { useToast } from '@/components/ui/toast';
 
 // ─── Types ───────────────────────────────────────────────────────────────
 
@@ -118,6 +119,10 @@ export default function CaseDetailPage() {
   const router = useRouter();
   const caseId = params?.id as string;
   const { user } = useCurrentUser();
+  // Story R-A1 (A9 anti-pattern closure) — the L2 pre-flight gate now
+  // surfaces a Toast error instead of the native `window.alert` so it sits
+  // in the same UI layer as every other validation message.
+  const { toast } = useToast();
 
   const [caseRecord, setCaseRecord] = useState<CaseRecord | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -524,9 +529,14 @@ export default function CaseDetailPage() {
                     const { isGatedTransition } = await import('@/lib/checklist');
                     if (isGatedTransition(newStatus)) {
                       const missing = failedChecklistKeys.join(', ') || 'một số mục lâm sàng';
-                      // eslint-disable-next-line no-alert
-                      window.alert(
+                      // Story R-A1 — replace native `window.alert` with a
+                      // Toast error. The message copy is preserved so the
+                      // pre-flight UX stays identical (only the transport
+                      // changes from a blocking native dialog to an
+                      // in-app error toast).
+                      toast(
                         `Không thể chuyển trạng thái: thiếu ${missing}. Vui lòng hoàn thành checklist trước.`,
+                        'error',
                       );
                       return;
                     }

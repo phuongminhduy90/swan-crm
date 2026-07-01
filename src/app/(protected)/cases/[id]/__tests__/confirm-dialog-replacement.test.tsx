@@ -51,11 +51,16 @@ describe('Story 6.3.5 / B.4.5 — cases/[id] remove-service uses <ConfirmDialog>
       expect(source).not.toMatch(/(?<!\w)confirm\(\s*['"]/);
     });
 
-    it('keeps the documented B.2.1 L2 window.alert (Sprint 7.x refactor scope)', () => {
-      // The B.2.1 L2 pre-flight alert is the ONE remaining native dialog,
+    it('closes the B.2.1 L2 window.alert — replaced with <Toast> in Story R-A1 (Sprint 6.4)', () => {
+      // The B.2.1 L2 pre-flight alert was the ONE remaining native dialog,
       // explicitly documented in the Sprint 6.3 plan §1 / §12.2 as
-      // out-of-scope for 6.3 (Sprint 7.x refactor).
-      expect(source).toMatch(/window\.alert\s*\(\s*`Không thể chuyển trạng thái/);
+      // out-of-scope for 6.3. Sprint 6.4 / Story R-A1 closes this A9
+      // anti-pattern: the alert is replaced by a `useToast()` call that
+      // renders an in-app error toast.
+      expect(source).not.toMatch(/window\.alert\s*\(\s*`Không thể chuyển trạng thái/);
+      // Sanity-check: the file does import `useToast` and references it.
+      expect(source).toMatch(/import\s*\{\s*useToast\s*\}\s*from\s*['"]@\/components\/ui\/toast['"]/);
+      expect(source).toMatch(/const\s*\{\s*toast\s*\}\s*=\s*useToast\(\)/);
     });
   });
 

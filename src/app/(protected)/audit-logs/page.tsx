@@ -99,6 +99,12 @@ const AUDIT_ACTION_LABELS: Record<AuditAction, { label: string; icon: React.Elem
   followup_escalated: { label: 'Escalate follow-up', icon: AlertTriangle, color: 'text-red-600 bg-red-50' },
   role_changed: { label: 'Đổi vai trò', icon: Users, color: 'text-purple-600 bg-purple-50' },
   note_added: { label: 'Thêm ghi chú', icon: FilePlus, color: 'text-gray-600 bg-gray-50' },
+  /**
+   * Story S3 / RR-4 — silent dashboard fallback. A StatCard computation
+   * failed and returned a safe default (currently `0`) so the dashboard
+   * would not blank. Investigate the data shape that triggered it.
+   */
+  dashboard_render_fallback: { label: 'Dashboard render fallback', icon: AlertTriangle, color: 'text-orange-600 bg-orange-50' },
 };
 
 const ENTITY_TYPE_LABELS: Record<AuditEntityType | 'all', string> = {
@@ -111,6 +117,10 @@ const ENTITY_TYPE_LABELS: Record<AuditEntityType | 'all', string> = {
   task: 'Công việc',
   followup: 'Follow-up',
   user: 'Người dùng',
+  /**
+   * Story S3 / RR-4 — dashboard surface (`/dashboard`).
+   */
+  dashboard: 'Dashboard',
 };
 
 export default function AuditLogsPage() {

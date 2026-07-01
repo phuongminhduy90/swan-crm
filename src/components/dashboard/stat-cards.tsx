@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useId } from 'react';
+import { useEffect, useState, useId, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { Users, FolderOpen, TrendingUp, Calendar, AlertTriangle, Info } from 'lucide-react';
 import { getAllCustomers, getAllCases, getAllPayments, getAllAppointments } from '@/lib/firestore';
@@ -8,6 +8,8 @@ import { cn } from '@/lib/utils/cn';
 import { formatCompact } from '@/lib/utils/format';
 import { Tooltip } from '@/components/ui/tooltip';
 import type { CaseRecord } from '@/lib/types';
+import { useAuth } from '@/lib/auth/AuthProvider';
+import { writeAuditLog } from '@/lib/firestore/audit';
 
 /**
  * Story S1 / B.3.2 (F-HIGH-29) — Vietnamese tooltip copy on the
@@ -141,13 +143,91 @@ export function countLabOverdueCases(cases: CaseRecord[], now: Date = new Date()
   }).length;
 }
 
+/**
+ * Story S3 / RR-4 — defensive default values for the dashboard load.
+ *
+ * The lab-overdue card in particular MUST NOT throw to the React error
+ * boundary on a stray data-shape drift (e.g. an unexpected `cases`
+ * element, a non-array input from a future mock, or a date-format
+ * change). When that happens we:
+ *
+ *  1. log a dev-only `console.warn` so a developer can see what blew up
+ *  2. write one `dashboard_render_fallback` audit log entry so the
+ *     silent failure is observable via `/audit-logs`
+ *  3. return `0` so the card renders normally (no white-screen of death)
+ *
+ * Exported for unit tests so we can drive the failure path deterministically.
+ */
+export function safeCountLabOverdueCases(
+  cases: CaseRecord[] | unknown,
+  now: Date,
+  onFallback: (error: unknown) => void,
+): number {
+  if (!Array.isArray(cases)) {
+    onFallback(new Error('lab_overdue_count: cases is not an array'));
+    return 0;
+  }
+  try {
+    return countLabOverdueCases(cases as CaseRecord[], now);
+  } catch (err) {
+    onFallback(err);
+    return 0;
+  }
+}
+
 export function StatCards() {
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<Stat[]>(INITIAL_STATS);
+  const { userProfile } = useAuth();
 
   // Stable, unique id for the screen-reader description block (one per render)
   const tooltipId = useId();
 
+  /**
+   * Story S3 / RR-4 — stable fallback handler shared between the lab-overdue
+   * computation path and any future per-stat-card defensive wrappers. Writes
+   * a single audit log on first fallback and logs to console.warn in dev mode.
+   */
+  const fallbackLoggedRef = useRef(false);
+
+  const handleStatFallback = useMemo(() => {
+    return (statName: string, error: unknown) => {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(
+          `[dashboard] ${statName} computation fallback`,
+          error,
+        );
+      }
+
+      // Write the audit log only once per mount to avoid spamming.
+      // The caller is responsible for wrapping in try/catch so the
+      // dashboard never blanks out on a failed audit log write.
+      if (!fallbackLoggedRef.current) {
+        fallbackLoggedRef.current = true;
+        try {
+          writeAuditLog({
+            actorId: userProfile?.id ?? 'system',
+            actorName: userProfile?.displayName ?? 'Hệ thống',
+            actorRole: userProfile?.role ?? 'admin',
+            action: 'dashboard_render_fallback',
+            entityType: 'dashboard',
+            entityId: 'home',
+            before: { stat: statName, errorMessage: String(error) },
+            after: { stat: statName, fallbackValue: 0 },
+          });
+        } catch {
+          // Never throw on audit-log failure
+        }
+      }
+    };
+  }, [userProfile]);
+
+  /**
+   * Story S3 / RR-4 — defensive memoized counts. Only the lab-overdue
+   * count needs to be defensive (per the story scope), but we keep the
+   * surrounding card-load logic on the same shape so the audit-log call
+   * site can be reused if other cards ever need hardening.
+   */
   useEffect(() => {
     let cancelled = false;
     async function load() {
@@ -161,34 +241,47 @@ export function StatCards() {
 
         if (cancelled) return;
 
+        const now = new Date();
+
         // Cases not completed/cancelled
-        const activeCases = cases.filter(
-          (c) => c.status !== 'completed' && c.status !== 'cancelled',
-        );
+        const activeCases = Array.isArray(cases)
+          ? cases.filter(
+              (c) => c.status !== 'completed' && c.status !== 'cancelled',
+            )
+          : [];
 
         // Revenue this month (confirmed payments)
-        const now = new Date();
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-        const confirmedThisMonth = payments
-          .filter(
-            (p) =>
-              p.status === 'confirmed' &&
-              new Date(p.paymentDate ?? p.createdAt) >= monthStart,
-          )
-          .reduce((sum, p) => sum + (p.amount ?? 0), 0);
+        const confirmedThisMonth = Array.isArray(payments)
+          ? payments
+              .filter(
+                (p) =>
+                  p.status === 'confirmed' &&
+                  new Date(p.paymentDate ?? p.createdAt) >= monthStart,
+              )
+              .reduce((sum, p) => sum + (p.amount ?? 0), 0)
+          : 0;
 
         // Appointments today
         const todayStr = now.toISOString().split('T')[0];
-        const todayAppts = appointments.filter((a) => {
-          const apptDate = new Date(a.startTime).toISOString().split('T')[0];
-          return apptDate === todayStr && a.status !== 'cancelled';
-        });
+        const todayAppts = Array.isArray(appointments)
+          ? appointments.filter((a) => {
+              const apptDate = new Date(a.startTime).toISOString().split('T')[0];
+              return apptDate === todayStr && a.status !== 'cancelled';
+            })
+          : [];
 
-        // Lab overdue (F-CRIT-07)
-        const labOverdueCount = countLabOverdueCases(cases, now);
+        // Lab overdue (F-CRIT-07) — Story S3 / RR-4: safe fallback
+        // returns 0 (never throws) and emits a single dashboard_render_fallback
+        // audit log entry so the silent failure is observable.
+        const labOverdueCount = safeCountLabOverdueCases(
+          cases,
+          now,
+          (error) => handleStatFallback('lab_overdue_count', error),
+        );
 
         setStats([
-          { ...INITIAL_STATS[0], value: customers.length },
+          { ...INITIAL_STATS[0], value: Array.isArray(customers) ? customers.length : 0 },
           { ...INITIAL_STATS[1], value: activeCases.length },
           { ...INITIAL_STATS[2], value: formatCompact(confirmedThisMonth) },
           { ...INITIAL_STATS[3], value: todayAppts.length },
@@ -204,7 +297,7 @@ export function StatCards() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [handleStatFallback]);
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">

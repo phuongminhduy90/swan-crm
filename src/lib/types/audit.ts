@@ -21,7 +21,14 @@ export type AuditAction =
   | 'followup_completed'
   | 'followup_escalated'
   | 'role_changed'
-  | 'note_added';
+  | 'note_added'
+  /**
+   * Story S3 / RR-4 — dashboard StatCard computation fell back to a safe
+   * default value (currently `0`) because the source data shape was
+   * unexpected and the computation threw. Indicates a data-quality issue
+   * that should be investigated; the dashboard still rendered.
+   */
+  | 'dashboard_render_fallback';
 
 export type AuditEntityType =
   | 'customer'
@@ -31,7 +38,13 @@ export type AuditEntityType =
   | 'consent'
   | 'task'
   | 'followup'
-  | 'user';
+  | 'user'
+  /**
+   * Story S3 / RR-4 — dashboard surface (e.g. `/dashboard`). Used only by
+   * `dashboard_render_fallback` events so the silent-fallback path can be
+   * traced via the existing `/audit-logs` UI.
+   */
+  | 'dashboard';
 
 export interface AuditLog {
   id: string;

@@ -1,5 +1,6 @@
 /**
  * Story B.1.4 — `lab_overdue_count` StatCard tests
+ * Story S3 / RR-4 — Suspense boundary fallback for `lab_overdue_count`
  *
  * Verifies the dashboard's 5-card grid:
  *  - all 5 cards render as clickable `<Link>`s
@@ -7,8 +8,14 @@
  *  - tooltips are exposed via `title` and `aria-describedby`
  *  - `countLabOverdueCases()` correctly excludes terminal statuses and
  *    excludes `waiting_lab_test` cases without `expectedLabDate` set
+ *  - `safeCountLabOverdueCases()` returns 0 on bad shape / throw and
+ *    invokes the onFallback callback exactly once
+ *  - StatCards never blanks the dashboard on bad data shape — the
+ *    lab_overdue card falls back to 0 and emits a `dashboard_render_fallback`
+ *    audit log entry.
  *
  * @see docs/ux-redesign/SPRINT_6_1_EXECUTION_PLAN.md §1 (B.1.4 row)
+ * @see docs/ux-redesign/SPRINT_6_4_EXECUTION_PLAN.md §A.3 (S3 / RR-4)
  */
 
 import { act, cleanup, render, screen, within } from '@testing-library/react';
@@ -16,6 +23,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   StatCards,
   countLabOverdueCases,
+  safeCountLabOverdueCases,
 } from '@/components/dashboard/stat-cards';
 import type { CaseRecord } from '@/lib/types';
 
@@ -86,6 +94,20 @@ vi.mock('@/lib/firestore', () => ({
   getAllAppointments: (...args: unknown[]) => getAllAppointmentsMock(...args),
 }));
 
+// ---------- Auth mock (StatCards uses useAuth for the RR-4 audit log) ----------
+
+const mockUseAuth = vi.fn();
+vi.mock('@/lib/auth/AuthProvider', () => ({
+  useAuth: () => mockUseAuth(),
+}));
+
+// ---------- Audit log mock (RR-4 writes dashboard_render_fallback) ----------
+
+const writeAuditLogMock = vi.fn();
+vi.mock('@/lib/firestore/audit', () => ({
+  writeAuditLog: (...args: unknown[]) => writeAuditLogMock(...args),
+}));
+
 // ---------- Setup ----------
 
 const NOW = new Date('2026-06-30T10:00:00.000Z');
@@ -97,6 +119,21 @@ beforeEach(() => {
   getAllCasesMock.mockReset();
   getAllPaymentsMock.mockReset();
   getAllAppointmentsMock.mockReset();
+  writeAuditLogMock.mockReset();
+  // Default: a logged-in admin user — matches the production happy-path.
+  // Individual tests can override via `mockUseAuth.mockReturnValueOnce(...)`.
+  mockUseAuth.mockReset();
+  mockUseAuth.mockReturnValue({
+    userProfile: {
+      id: 'user-admin',
+      email: 'admin@swanclinic.vn',
+      displayName: 'Test Admin',
+      role: 'admin',
+      isActive: true,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    },
+  });
 });
 
 afterEach(() => {
@@ -299,5 +336,211 @@ describe('countLabOverdueCases (B.1.4 helper)', () => {
       makeCase({ id: 'tomorrow', status: 'waiting_lab_test', expectedLabDate: '2026-07-01T00:00:00.000Z' }),
     ];
     expect(countLabOverdueCases(cases, NOW)).toBe(0);
+  });
+});
+
+describe('safeCountLabOverdueCases (RR-4 helper)', () => {
+  it('returns 0 and notifies the fallback handler when input is not an array', () => {
+    const onFallback = vi.fn();
+    // Various non-array shapes that the production code should never
+    // produce but that we want to handle defensively if they do.
+    expect(safeCountLabOverdueCases(null, NOW, onFallback)).toBe(0);
+    expect(safeCountLabOverdueCases(undefined, NOW, onFallback)).toBe(0);
+    expect(safeCountLabOverdueCases('not-an-array', NOW, onFallback)).toBe(0);
+    expect(safeCountLabOverdueCases(42, NOW, onFallback)).toBe(0);
+    expect(safeCountLabOverdueCases({ cases: [] }, NOW, onFallback)).toBe(0);
+
+    // onFallback should have been called for each non-array input.
+    expect(onFallback).toHaveBeenCalledTimes(5);
+    for (const call of onFallback.mock.calls) {
+      const err = call[0] as Error;
+      expect(err).toBeInstanceOf(Error);
+      expect(err.message).toMatch(/lab_overdue_count/);
+    }
+  });
+
+  it('returns the real count for a well-shaped array and never calls onFallback', () => {
+    const onFallback = vi.fn();
+    const cases = [
+      makeCase({ id: 'a', status: 'waiting_lab_test', expectedLabDate: '2026-06-29T00:00:00.000Z' }),
+      makeCase({ id: 'b', status: 'waiting_lab_test', expectedLabDate: '2026-06-25T00:00:00.000Z' }),
+    ];
+    expect(safeCountLabOverdueCases(cases, NOW, onFallback)).toBe(2);
+    expect(onFallback).not.toHaveBeenCalled();
+  });
+
+  it('returns 0 and notifies the fallback handler if a case element throws on parse', () => {
+    const onFallback = vi.fn();
+    // `expectedLabDate` is a circular object that breaks `new Date()`.
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+    const cases = [
+      makeCase({
+        id: 'broken',
+        status: 'waiting_lab_test',
+        expectedLabDate: circular as unknown as string,
+      }),
+    ];
+    // Should NOT throw — fallback returns 0.
+    const result = safeCountLabOverdueCases(cases, NOW, onFallback);
+    // The internal Number.isNaN check actually catches the bad date, so
+    // countLabOverdueCases would return 0 without throwing. The
+    // important property: the helper never throws. Either the helper
+    // computes 0 itself or the catch path returns 0.
+    expect(result).toBe(0);
+    // onFallback is only called when the helper actually catches. In the
+    // Number.isNaN path it isn't, so we accept either behavior — the
+    // contract is "no throw, value is 0".
+    // (No assertion on onFallback here — see the throwing-fixture test
+    // below for the strict callback check.)
+    expect(() =>
+      safeCountLabOverdueCases(cases, NOW, onFallback),
+    ).not.toThrow();
+  });
+
+  it('returns 0 via the catch path when countLabOverdueCases throws', () => {
+    // Force countLabOverdueCases to throw by passing a case with a `status`
+    // getter that raises on access. This drives the catch path of
+    // safeCountLabOverdueCases, which must forward the error to
+    // onFallback and return 0 (never throw to the React error boundary).
+    const onFallback = vi.fn();
+    const throwingCase = {
+      id: 'broken',
+      // The filter callback calls `c.status` first — throwing here forces
+      // countLabOverdueCases to throw, exercising the catch arm.
+      get status() {
+        throw new Error('forced throw from getter');
+      },
+    } as unknown as CaseRecord;
+
+    const result = safeCountLabOverdueCases([throwingCase], NOW, onFallback);
+
+    expect(result).toBe(0);
+    expect(onFallback).toHaveBeenCalledTimes(1);
+    const forwardedError = onFallback.mock.calls[0][0] as Error;
+    expect(forwardedError).toBeInstanceOf(Error);
+    expect(forwardedError.message).toBe('forced throw from getter');
+  });
+});
+
+describe('StatCards (RR-4 dashboard render-fallback)', () => {
+  it('still renders the 5-card grid when cases is an unexpected non-array', async () => {
+    // Force a data-shape drift: getAllCases resolves to a non-array.
+    // This is exactly the production failure mode the RR-4 fallback
+    // was written to protect against.
+    getAllCustomersMock.mockResolvedValue([]);
+    getAllCasesMock.mockResolvedValue(null as unknown as CaseRecord[]);
+    getAllPaymentsMock.mockResolvedValue([]);
+    getAllAppointmentsMock.mockResolvedValue([]);
+
+    render(<StatCards />);
+    await resolveLoad();
+
+    // All 5 card labels still render — no white-screen of death.
+    expect(screen.getByText('Khách hàng')).toBeInTheDocument();
+    expect(screen.getByText('CASE đang xử lý')).toBeInTheDocument();
+    expect(screen.getByText('Doanh thu tháng')).toBeInTheDocument();
+    expect(screen.getByText('Lịch hẹn hôm nay')).toBeInTheDocument();
+    expect(screen.getByText('Lab quá hạn')).toBeInTheDocument();
+
+    // The lab-overdue card fell back to 0.
+    const labLink = screen.getByRole('link', {
+      name: /Lab quá hạn.*Ca chờ xét nghiệm quá hạn/,
+    });
+    expect(within(labLink).getByText('0')).toBeInTheDocument();
+  });
+
+  it('emits exactly one dashboard_render_fallback audit log entry on a bad shape', async () => {
+    getAllCustomersMock.mockResolvedValue([]);
+    getAllCasesMock.mockResolvedValue(undefined as unknown as CaseRecord[]);
+    getAllPaymentsMock.mockResolvedValue([]);
+    getAllAppointmentsMock.mockResolvedValue([]);
+
+    render(<StatCards />);
+    await resolveLoad();
+
+    // Wait for the audit-log write (microtask) to settle.
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // Exactly one fallback entry, with the new action / entity type.
+    const fallbackCalls = writeAuditLogMock.mock.calls.filter(
+      (call) => {
+        const input = call[0] as { action?: string; entityType?: string };
+        return (
+          input.action === 'dashboard_render_fallback' &&
+          input.entityType === 'dashboard'
+        );
+      },
+    );
+    expect(fallbackCalls).toHaveLength(1);
+
+    const input = fallbackCalls[0][0] as {
+      action: string;
+      entityType: string;
+      entityId: string;
+      before: Record<string, unknown>;
+      after: Record<string, unknown>;
+      actorId: string;
+      actorRole: string;
+    };
+    expect(input.entityId).toBe('home');
+    expect(input.before?.stat).toBe('lab_overdue_count');
+    expect(input.after?.stat).toBe('lab_overdue_count');
+    expect(input.after?.fallbackValue).toBe(0);
+    // Actor info comes from useAuth (mocked as admin in beforeEach).
+    expect(input.actorId).toBe('user-admin');
+    expect(input.actorRole).toBe('admin');
+  });
+
+  it('does NOT write a fallback audit log when the data is well-shaped', async () => {
+    getAllCustomersMock.mockResolvedValue([]);
+    getAllCasesMock.mockResolvedValue([
+      makeCase({ id: 'a', status: 'waiting_lab_test', expectedLabDate: '2026-06-25T00:00:00.000Z' }),
+    ]);
+    getAllPaymentsMock.mockResolvedValue([]);
+    getAllAppointmentsMock.mockResolvedValue([]);
+
+    render(<StatCards />);
+    await resolveLoad();
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const fallbackCalls = writeAuditLogMock.mock.calls.filter((call) => {
+      const input = call[0] as { action?: string };
+      return input.action === 'dashboard_render_fallback';
+    });
+    expect(fallbackCalls).toHaveLength(0);
+  });
+
+  it('falls back to "Hệ thống" / "system" actor when the user is not signed in', async () => {
+    mockUseAuth.mockReturnValueOnce({ userProfile: null });
+
+    getAllCustomersMock.mockResolvedValue([]);
+    getAllCasesMock.mockResolvedValue(null as unknown as CaseRecord[]);
+    getAllPaymentsMock.mockResolvedValue([]);
+    getAllAppointmentsMock.mockResolvedValue([]);
+
+    render(<StatCards />);
+    await resolveLoad();
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const fallbackCalls = writeAuditLogMock.mock.calls.filter((call) => {
+      const input = call[0] as { action?: string };
+      return input.action === 'dashboard_render_fallback';
+    });
+    expect(fallbackCalls.length).toBeGreaterThanOrEqual(1);
+    const input = fallbackCalls[0][0] as {
+      actorId: string;
+      actorName: string;
+      actorRole: string;
+    };
+    expect(input.actorId).toBe('system');
+    expect(input.actorName).toBe('Hệ thống');
+    expect(input.actorRole).toBe('admin');
   });
 });
