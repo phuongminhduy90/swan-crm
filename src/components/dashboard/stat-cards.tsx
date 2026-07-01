@@ -2,11 +2,25 @@
 
 import { useEffect, useState, useId } from 'react';
 import Link from 'next/link';
-import { Users, FolderOpen, TrendingUp, Calendar, AlertTriangle } from 'lucide-react';
+import { Users, FolderOpen, TrendingUp, Calendar, AlertTriangle, Info } from 'lucide-react';
 import { getAllCustomers, getAllCases, getAllPayments, getAllAppointments } from '@/lib/firestore';
 import { cn } from '@/lib/utils/cn';
 import { formatCompact } from '@/lib/utils/format';
+import { Tooltip } from '@/components/ui/tooltip';
 import type { CaseRecord } from '@/lib/types';
+
+/**
+ * Story S1 / B.3.2 (F-HIGH-29) — Vietnamese tooltip copy on the
+ * "Doanh thu tháng" StatCard. Byte-exact, signed off by Accountant Lead.
+ * Communicates that the headline number only counts `confirmed` payments —
+ * it excludes `pending` and `refunded`. Do not edit without re-sign-off
+ * (Sprint 6.4 §3.3 sign-off gate).
+ */
+const REVENUE_TOOLTIP_COPY =
+  'Chỉ tính thanh toán đã xác nhận, không bao gồm đang chờ hoặc hoàn tiền';
+
+/** Stable id for the B.3.2 revenue tooltip bubble. */
+const REVENUE_TOOLTIP_LABEL = 'Thông tin thêm về doanh thu tháng';
 
 interface Stat {
   label: string;
@@ -57,7 +71,13 @@ const INITIAL_STATS: Stat[] = [
     label: 'Doanh thu tháng',
     value: LOADING_VALUE,
     hint: 'Đã xác nhận trong tháng',
-    tooltip: 'Tổng các thanh toán đã xác nhận trong tháng hiện tại',
+    /**
+     * B.3.2 (F-HIGH-29): the tooltip text surfaced on hover/focus is the
+     * Accountant-Lead-signed Vietnamese copy. The previous terse text
+     * was ambiguous — it said "Tổng các thanh toán đã xác nhận" without
+     * disambiguating that pending and refund statuses are excluded.
+     */
+    tooltip: REVENUE_TOOLTIP_COPY,
     icon: TrendingUp,
     bg: 'bg-emerald-100',
     color: 'text-emerald-700',
@@ -191,63 +211,107 @@ export function StatCards() {
       {stats.map((stat) => {
         const Icon = stat.icon;
         const isDanger = stat.variant === 'danger';
+        // B.3.2 (F-HIGH-29): the revenue card is the only one that gets a
+        // visible Tooltip + Info affordance. All other cards keep their
+        // existing sr-only description pattern.
+        const isRevenue = stat.label === 'Doanh thu tháng';
+        const cardTooltipId = `${tooltipId}-${stat.label}`;
         return (
-          <Link
-            key={stat.label}
-            href={stat.href}
-            aria-label={`${stat.label} — ${stat.hint}`}
-            aria-describedby={`${tooltipId}-${stat.label}`}
-            title={stat.tooltip}
-            className={cn(
-              'group relative overflow-hidden rounded-2xl border bg-white p-5 shadow-soft transition-all duration-300 hover:shadow-medium hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-swan-500 focus-visible:ring-offset-2',
-              isDanger
-                ? 'border-red-200/80 hover:border-red-300'
-                : 'border-gray-100/80',
-            )}
-          >
-            <div
-              className="absolute -right-3 -top-3 h-20 w-20 rounded-full bg-gradient-to-br opacity-[0.07] group-hover:opacity-[0.12] transition-opacity"
-              style={{ backgroundImage: `linear-gradient(135deg, var(--tw-gradient-stops))` }}
-            />
-            <div
+          <div key={stat.label} className="relative">
+            <Link
+              href={stat.href}
+              aria-label={`${stat.label} — ${stat.hint}`}
+              aria-describedby={cardTooltipId}
+              title={stat.tooltip}
               className={cn(
-                'flex h-12 w-12 items-center justify-center rounded-2xl shadow-sm',
-                stat.bg,
+                'group relative block overflow-hidden rounded-2xl border bg-white p-5 shadow-soft transition-all duration-300 hover:shadow-medium hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-swan-500 focus-visible:ring-offset-2',
+                isDanger
+                  ? 'border-red-200/80 hover:border-red-300'
+                  : 'border-gray-100/80',
               )}
             >
-              <Icon className={cn('h-6 w-6', stat.color)} aria-hidden="true" />
-            </div>
-            <div className="mt-3 min-w-0 flex-1">
-              <p
+              <div
+                className="absolute -right-3 -top-3 h-20 w-20 rounded-full bg-gradient-to-br opacity-[0.07] group-hover:opacity-[0.12] transition-opacity"
+                style={{ backgroundImage: `linear-gradient(135deg, var(--tw-gradient-stops))` }}
+              />
+              <div
                 className={cn(
-                  'text-xs font-medium',
-                  isDanger ? 'text-red-700' : 'text-gray-500',
+                  'flex h-12 w-12 items-center justify-center rounded-2xl shadow-sm',
+                  stat.bg,
                 )}
               >
-                {stat.label}
-              </p>
-              <p
-                className={cn(
-                  'mt-0.5 text-2xl font-bold tabular-nums',
-                  isDanger ? 'text-red-700' : 'text-gray-900',
-                )}
-              >
-                {stat.value}
-              </p>
-              <p
-                className={cn(
-                  'mt-0.5 text-xs',
-                  isDanger ? 'text-red-500/80' : 'text-gray-400',
-                )}
-              >
-                {stat.hint}
-              </p>
-            </div>
-            {/* Hidden accessible description — provides the long-form tooltip for screen readers via aria-describedby. */}
-            <span id={`${tooltipId}-${stat.label}`} className="sr-only">
-              {stat.tooltip}
-            </span>
-          </Link>
+                <Icon className={cn('h-6 w-6', stat.color)} aria-hidden="true" />
+              </div>
+              <div className="mt-3 min-w-0 flex-1">
+                <p
+                  className={cn(
+                    'text-xs font-medium',
+                    isDanger ? 'text-red-700' : 'text-gray-500',
+                  )}
+                >
+                  {stat.label}
+                </p>
+                <p
+                  className={cn(
+                    'mt-0.5 text-2xl font-bold tabular-nums',
+                    isDanger ? 'text-red-700' : 'text-gray-900',
+                  )}
+                >
+                  {stat.value}
+                </p>
+                <p
+                  className={cn(
+                    'mt-0.5 text-xs',
+                    isDanger ? 'text-red-500/80' : 'text-gray-400',
+                  )}
+                >
+                  {stat.hint}
+                </p>
+              </div>
+              {/* Hidden accessible description — provides the long-form
+                  tooltip for screen readers via aria-describedby. The
+                  revenue card skips this and uses the visible Tooltip
+                  instead (B.3.2 / F-HIGH-29). */}
+              {!isRevenue && (
+                <span id={cardTooltipId} className="sr-only">
+                  {stat.tooltip}
+                </span>
+              )}
+            </Link>
+
+            {/* B.3.2 (F-HIGH-29): visible tooltip affordance on the revenue
+                card only. The Info button is rendered OUTSIDE the <Link>
+                to avoid nested-interactive-content (button-inside-anchor)
+                and to escape the Link's `overflow-hidden` clipping boundary.
+                The visible Tooltip <p> uses the same id as the Link's
+                `aria-describedby`, so the screen-reader description remains
+                continuous with the existing pattern. */}
+            {isRevenue && (
+              <div className="pointer-events-none absolute right-2 top-2 z-10">
+                <div className="pointer-events-auto">
+                  <Tooltip
+                    id={cardTooltipId}
+                    content={REVENUE_TOOLTIP_COPY}
+                    placement="bottom"
+                    align="end"
+                  >
+                    <button
+                      type="button"
+                      aria-label={REVENUE_TOOLTIP_LABEL}
+                      data-testid="revenue-tooltip-trigger"
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-full text-emerald-600/80 transition-colors hover:bg-emerald-50 hover:text-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+                    >
+                      <Info
+                        className="h-4 w-4"
+                        aria-hidden="true"
+                        strokeWidth={1.5}
+                      />
+                    </button>
+                  </Tooltip>
+                </div>
+              </div>
+            )}
+          </div>
         );
       })}
 
