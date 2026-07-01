@@ -2,9 +2,9 @@
 
 Hệ thống quản lý khách hàng và hồ sơ phẫu thuật thẩm mỹ cho Swan Clinic.
 
-**Current status:** Phase 1–4 đã hoàn thành + Phase 5 (Reports + Seed expansion). Full project scaffold, authentication, role-based access control, customers (với dialog CRUD + delete approval), cases, payments, services, tasks, calendar, checklist, status workflow, attachments, consents, post-op follow-ups, notifications, audit logs, **reports page (3 tabs với charts)**, và premium Apple/Stripe-style theme.
+**Current status:** Phase 1–5 ✅ + Phase 6 (UX Redesign — Sprints 6.1–6.4) ✅. Full project scaffold, authentication, role-based access control, customers (với dialog CRUD + delete approval), cases, payments, services, tasks, calendar, checklist, status workflow, attachments, consents, post-op follow-ups, notifications, audit logs, **reports page (3 tabs với charts)**, premium Apple/Stripe-style theme, server-side RBAC, payment SoD, clinical checklist gate, revenue tooltip, refund chart, mobile visual regression harness, **683 vitest tests + 28 Playwright snapshots**, **6 feature flags** (all default OFF in prod).
 
-> Phase 5 còn lại (chưa làm): Firebase security rules (`firebase.json`, `storage.rules`, `firestore.indexes.json`) + Vercel deployment config.
+> Phase 7 (Sprint 7.1–7.5) sắp tới: UI library refactor (`<CurrencyInput>`, shared Tabs + URL-sync), consent gate, Firebase security rules deployment, Vercel deployment. Xem [`docs/ux-redesign/SPRINT_7_EXECUTION_PLAN.md`](docs/ux-redesign/SPRINT_7_EXECUTION_PLAN.md).
 
 ## Tech Stack
 
@@ -15,6 +15,8 @@ Hệ thống quản lý khách hàng và hồ sơ phẫu thuật thẩm mỹ cho
 - **React Hook Form** + **Zod** validation
 - **Lucide React** icons
 - **Recharts** cho reports (Phase 5)
+- **Vitest** + **@testing-library/react** cho unit/integration tests (683 tests, Phase 6)
+- **Playwright** cho mobile visual regression (28 snapshots × 5 viewports, Phase 6.4)
 
 ## Brand Colors
 
@@ -117,6 +119,11 @@ npm run start        # Run production build
 npm run lint         # ESLint
 npm run typecheck    # TypeScript check (npx tsc --noEmit)
 npm run lint:fix     # ESLint auto-fix
+npm run test         # Vitest (unit + integration, 683 tests)
+npm run test:watch   # Vitest watch mode
+npm run test:cov     # Vitest with v8 coverage
+npm run test:ui      # Vitest UI
+npx playwright test  # Mobile visual regression (28 snapshots, requires `npm run dev`)
 ```
 
 ## Cấu trúc dự án
@@ -144,10 +151,10 @@ src/
 │   ├── page.tsx                      # Root redirect
 │   └── globals.css                   # Premium theme tokens + glass utilities
 ├── components/
-│   ├── ui/                           # 16 premium UI components (Button, Modal, Toast, ...)
+│   ├── ui/                           # 17 premium UI components (Button, Modal, Toast, Tooltip, Tabs, ...)
 │   ├── layout/                       # Sidebar (glass), Topbar (glass), MobileNav, AppShell
 │   ├── auth/                         # LoginForm
-│   ├── dashboard/                    # StatCards (real data), RecentActivity (real data)
+│   ├── dashboard/                    # StatCards (real data + revenue tooltip), RecentActivity
 │   ├── users/                        # UsersTable, CreateUserDialog, EditUserDialog
 │   ├── customers/                    # CustomerList (actions column), CustomerForm
 │   ├── cases/                        # CaseList, CaseForm, StatusBadge, StatusWorkflow, BillSummary
@@ -182,6 +189,19 @@ src/
     ├── service-categories.ts         # Service category labels
     ├── payment-methods.ts            # PAYMENT_METHOD_LABELS + HEX (Phase 5)
     └── customer-meta.ts              # CUSTOMER_SOURCE + PRIVACY_LEVEL labels + hex (Phase 5)
+
+tests/                                  # Playwright E2E + visual regression (Phase 6.4)
+├── visual-helpers.ts                  # Pure helpers (route matrix, baseline filename, settle)
+└── visual-regression.spec.ts          # 25 visual snapshot tests + 3 diagnostic tests
+
+playwright.config.ts                   # 5-viewport matrix (iPhone SE 360 / iPhone 12 390 / Pixel 7 412 / iPad Mini 768 / Desktop 1280)
+docs/ux-redesign/                      # Phase 6 + 7 sprint + story docs
+├── SPRINT_6_{1,2,3,4}_EXECUTION_PLAN.md
+├── SPRINT_6_{1,2,3,4}_COMPLETION_REPORT.md
+├── SPRINT_7_EXECUTION_PLAN.md
+├── STORY_*_IMPLEMENTATION_REPORT.md   # 59 files
+├── STORY_*_MIGRATION_NOTES.md
+└── visual-baselines/                  # 25 PNG baselines (capture pending)
 ```
 
 ## Roles & Permissions
@@ -203,6 +223,21 @@ src/
 - **PAYMENT_CONFIRM_ROLES**: Ai được xác nhận thanh toán → `admin, accountant`
 
 Permission matrix defined in `src/config/roles.ts` and `src/constants/permissions.ts`. Sidebar menu items are filtered by role.
+
+### Feature Flags (Phase 6+, all default OFF in production)
+
+Tất cả 6 flags hiện có default `false` ở production — chỉ bật sau khi có sign-off đầy đủ (CEO + accountant-lead + medical director + product-owner). Khi dev (`NEXT_PUBLIC_DEV_MODE=true`), một số flag sẽ được bật trong code path.
+
+| Flag | Story | Promotion gate |
+|:-----|:------|:---------------|
+| `NEXT_PUBLIC_FEATURE_SHARED_MENU` | A.5 (6.1) | Triple sign-off |
+| `NEXT_PUBLIC_FEATURE_SERVER_RBAC` | B.1.3 (6.1) | Triple sign-off |
+| `NEXT_PUBLIC_FEATURE_PAYMENT_SOD` | B.3.1 (6.1) | CEO + accountant-lead + PO |
+| `NEXT_PUBLIC_FEATURE_CLINICAL_CHECKLIST` | B.2.1 (6.2) | Medical director + CEO + PO |
+| `NEXT_PUBLIC_FEATURE_CHECKLIST_GATE` | B.2.1 (6.2) | Medical director + CEO + PO |
+| `NEXT_PUBLIC_FEATURE_MINH_SCREEN` | 6.3 | C-3 visual baseline (Sprint 7.1) |
+
+**Sprint 7 sẽ thêm:** `NEXT_PUBLIC_FEATURE_URL_TABS` (7.2) + `NEXT_PUBLIC_FEATURE_CONSENT_GATE` (7.4).
 
 ## Customer Flow
 
@@ -289,6 +324,74 @@ Permission matrix defined in `src/config/roles.ts` and `src/constants/permission
 - **Firebase config files**: `firebase.json`, `.firebaserc`, `firestore.indexes.json`, `storage.rules` (chưa có)
 - **Vercel deployment**: `vercel.json`, security headers, deployment docs (chưa có)
 - `firestore.rules` đã có sẵn (316 dòng, RBAC đầy đủ + field-level security) — chỉ cần file config để deploy
+- **Đã được roll vào Sprint 7.4 (C-4) và 7.5 (C-5)** — xem Phase 7 bên dưới.
+
+### ✅ Phase 6 — UX Redesign + Revenue Integrity (Sprints 6.1–6.4)
+
+**20 stories × 4 sprints** — closed 9 anti-patterns (A1/A2/A6/A8/A9/A10/A11/A12/A22), shipped 6 feature flags (all default OFF in prod), established premium design system với glass morphism, gradient backgrounds, full a11y primitives. Test coverage: **0 → 683 vitest** + **0 → 28 Playwright**.
+
+#### Sprint 6.1 — Foundation (5 stories)
+- **A.5** Shared sidebar menu config (12 roles render identical sidebar) — flag `SHARED_MENU`
+- **B.1.1** CCCD fields visibility — added `sales_online/offline` to `SENSITIVE_FIELD_ACCESS_ROLES`
+- **B.1.2** `hospital_confirmed → scheduled` blocked transition
+- **B.1.3** Server-side role enforcement for case status — flag `SERVER_RBAC`
+- **B.3.1** Payment separation of duties (caller cannot confirm own payment) — flag `PAYMENT_SOD`
+- **B.1.4** Dashboard `lab_overdue_count` clickable card
+
+#### Sprint 6.2 — Clinical Safety (4 stories)
+- **B.1.5** Auto-escalate overdue followup (24h → `postop_followup_overdue`)
+- **B.2.1** Clinical checklist gate (pre-hospital + pre-procedure, blocks status transitions when incomplete) — flags `CLINICAL_CHECKLIST` + `CHECKLIST_GATE`
+- **B.2.2** `medical_alert_resolved` terminal status
+- **B.2.3** Audit PII redaction (no CCCD/phone in audit JSON)
+- **B.2.4** `procedure_completed` 2nd-confirm with date picker
+
+#### Sprint 6.3 — Premium Polish (6 stories)
+- **A.1** Tabs ARIA + arrow-key navigation
+- **A.2** Modal focus trap + `aria-labelledby`
+- **A.3** CloseIconButton (a11y label `Đóng`)
+- **A.6** ConfirmDialog `animate-scale-in` icon
+- **B.4.1–B.4.6** AppShell `min-h-screen`, next-owner banner, payment display names, topbar profile toast, native confirm→ConfirmDialog, status filter responsive
+- **MINH_SCREEN** flag (default OFF, pending visual baseline)
+
+#### Sprint 6.4 — Revenue Integrity (5 stories)
+- **B.3.2** Revenue tooltip on dashboard StatCard — Info icon + Vietnamese copy, keyboard accessible, WCAG AAA contrast
+- **B.3.4** Refund line + annotation on revenue chart — 2 series (confirmed + refund, dashed red `#EF4444`), responsive annotation `Đã xác nhận − Hoàn tiền`
+- **RR-4** Suspense fallback for `lab_overdue_count` — bad data → card shows `0` + `dashboard_render_fallback` audit log (no white-screen)
+- **R-A1** Last A9 close: `window.alert` → `<Toast error>` (B.2.1 L2 pre-flight)
+- **C-3** Mobile visual regression harness — Playwright + 28 tests across 5 viewports
+
+#### Phase 6 Test Pyramid
+
+| Layer | Count | Tool |
+|:------|------:|:-----|
+| TypeScript | 0 errors | `tsc --noEmit` |
+| ESLint | 0 warnings | `next lint` |
+| Vitest unit + integration | 683 passing (35 files) | `@testing-library/react` |
+| Playwright visual | 28 listed (25 snapshots + 3 diagnostic) | `@playwright/test` |
+| Anti-pattern grep | 0 violations (A1/A2/A7/A8/A9/A10/A14/A23/A26) | shell greps |
+| Build | 34 routes, ~87.4 kB shared JS | `next build` |
+
+### 🔜 Phase 7 — UI Library Refactor + Consent Gate + Production Hardening (Sprint 7.1–7.5)
+
+**25 stories × 5 sub-sprints** — capacity ~119h vs ~400h buffer (~297h buffer for sign-offs + visual baseline + production deployment). Xem [`docs/ux-redesign/SPRINT_7_EXECUTION_PLAN.md`](docs/ux-redesign/SPRINT_7_EXECUTION_PLAN.md).
+
+| Sub-sprint | Theme | Stories | Risk | New flags |
+|:-----------|:------|--------:|:----:|:---------:|
+| **7.1** | A11y Foundation + Tech Debt | 7 | 🟢 | — |
+| **7.2** | UI Library Refactor | 4 | 🟡 | `URL_TABS` |
+| **7.3** | Forms + Inputs | 5 | 🟡 | — |
+| **7.4** | Consent + Privacy + Security | 6 | 🔴 | `CONSENT_GATE` |
+| **7.5** | Notifications + Polish + Release | 13 | 🟡 | — |
+
+**Highlight stories:**
+- **C.2.1** `<CurrencyInput>` component (A10 anti-pattern closure)
+- **C.2.2** Shared Tabs + URL-sync (`?tab=`) — enables notification deep-links
+- **C.4.1 + C.4.2** Server-side + frontend consent gate on `public_marketing` uploads
+- **C-4** Firebase security rules deployment (`firebase.json` + `storage.rules` + `indexes.json`)
+- **C-5** Vercel deployment config (`vercel.json` + security headers)
+- **PH-10** `release/v7.0.0` tag + release notes (final Phase C close)
+
+**Target test count:** ~683 → **~890 tests** across ~45 files (+207 estimated).
 
 ## Tech Highlights
 
@@ -334,5 +437,12 @@ Permission matrix defined in `src/config/roles.ts` and `src/constants/permission
 - **Audit logging** — 18 action types, ghi tự động ở attachment upload/delete, consent status change
 - **Reports page** — `/reports` với 3 tabs (Revenue/Pipeline/Customer), filter theo khoảng thời gian, dùng Recharts. Tất cả charts nhận hex colors từ `chart-theme.ts` (không phải Tailwind classes).
 - **Seed data coverage** — payments (23) spread 6 tháng, followups (26) cho 4 cases, audit logs (30) spread Jan–Jun 2026
+- **Feature flags** — 6 flags default OFF in prod (xem bảng phía trên). Sprint 7 sẽ thêm `URL_TABS` + `CONSENT_GATE`. Khi modify behavior mới liên quan RBAC/SoD/consent, cân nhắc gate.
+- **Tooltip primitive** — dùng `<Tooltip>` từ `@/components/ui/tooltip.tsx` (Sprint 6.4). Đừng tự build bằng CSS `hover:`.
+- **Toast thay `window.alert/confirm`** — A9 anti-pattern đã đóng. Mọi error/confirm UI phải dùng `useToast()` hoặc `<ConfirmDialog>`.
+- **Revenue tooltip** — Dashboard StatCard "Doanh thu tháng" có Info icon (Vietnamese copy `Chỉ tính thanh toán đã xác nhận, không bao gồm đang chờ hoặc hoàn tiền`).
+- **Refund chart** — Reports Revenue tab có 2 series: confirmed (swan aqua) + refund (red `#EF4444`, dashed). Annotation `Đã xác nhận − Hoàn tiền` ở desktop, mobile variant `< 640px`.
+- **Visual regression** — `npx playwright test` chạy 25 PNG snapshots × 5 viewports (iPhone SE 360 / iPhone 12 390 / Pixel 7 412 / iPad Mini 768 / Desktop 1280). PNG capture + tag `visual-baseline-v6.4` pending (operator action).
+- **Anti-pattern gate** — Sprint 7.1 sẽ có `scripts/check-anti-patterns.sh` (A2/A8/A9/A22/A26 greps). Hiện tại chạy thủ công.
 
-Xem `CLAUDE.md` để biết thêm về conventions, project structure, và bug fixes.
+Xem `CLAUDE.md` để biết thêm về conventions, project structure, Phase 6 + 7 progress, và bug fixes.
