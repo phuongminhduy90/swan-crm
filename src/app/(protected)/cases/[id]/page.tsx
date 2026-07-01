@@ -27,6 +27,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Tabs } from '@/components/ui/tabs';
 import { CaseStatusBadge } from '@/components/cases/status-badge';
 import { BillSummary } from '@/components/cases/bill-summary';
+import { BillRecomputeIndicator } from '@/components/cases/bill-recompute-indicator';
 import { PaymentList } from '@/components/payments/payment-list';
 import { PaymentForm } from '@/components/payments/payment-form';
 import { formatDateVN, formatPhone, formatCurrency } from '@/lib/utils/format';
@@ -503,7 +504,16 @@ export default function CaseDetailPage() {
             <InfoRow label="Bảo mật" value={privacyCfg?.label} />
           </Card>
           <Card>
-            <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-swan-600">Tổng quan bill</h3>
+            <div className="mb-2 flex items-start justify-between gap-3">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-swan-600">Tổng quan bill</h3>
+              {/* Story PI-1 (Sprint 7.2) — Bill-recompute indicator chip.
+                  Renders behind NEXT_PUBLIC_FEATURE_BILL_RECOMPUTE; production
+                  keeps the Sprint 6.4 surface (chip returns null) until the
+                  C-7 accountant pairing sign-off. The chip answers "when was
+                  this bill last reconciled with the payment history?" — the
+                  third of the 10 core case questions per Sprint 7.2 §0.4. */}
+              <BillRecomputeIndicator caseRecord={caseRecord} />
+            </div>
             <BillSummary caseRecord={caseRecord} />
           </Card>
           <Card className="lg:col-span-2">

@@ -12,3 +12,4 @@ export * from './attachment';
 export * from './consent';
 export * from './followup';
 export * from './audit';
+export * from './billing';
