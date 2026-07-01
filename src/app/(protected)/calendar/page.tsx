@@ -441,6 +441,7 @@ export default function CalendarPage() {
         title="Tạo lịch hẹn mới"
         description="Điền thông tin để tạo lịch hẹn"
         size="lg"
+        closeLabel="Đóng hộp thoại tạo lịch hẹn"
       >
         <div className="space-y-4 p-6">
           <Input

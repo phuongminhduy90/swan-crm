@@ -337,6 +337,7 @@ export function ConsentPanel({
         onClose={() => setCreateOpen(false)}
         title="Tạo consent mới"
         size="md"
+        closeLabel="Đóng hộp thoại tạo consent"
       >
         <form onSubmit={handleSubmit(onCreateSubmit)} className="space-y-4">
           <Select

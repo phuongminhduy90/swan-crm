@@ -24,6 +24,16 @@ interface ModalProps {
    * When omitted, an id is generated internally via `React.useId()`.
    */
   descriptionId?: string;
+  /**
+   * Story C.1.1 (Sprint 7.1) — per-context `aria-label` for the close icon
+   * button rendered in the top-right corner. Defaults to the generic
+   * Vietnamese "Đóng" so existing consumers stay backwards-compatible.
+   *
+   * When provided, the label is forwarded to `<CloseIconButton>` so screen
+   * readers announce e.g. "Đóng hộp thoại chỉnh sửa khách hàng" instead of
+   * the generic "Đóng", satisfying WCAG 2.4.6 (headings and labels).
+   */
+  closeLabel?: string;
 }
 
 /**
@@ -54,6 +64,7 @@ export function Modal({
   className,
   titleId: titleIdProp,
   descriptionId: descriptionIdProp,
+  closeLabel = 'Đóng',
 }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -224,11 +235,14 @@ const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
         )}
 
         {/* Close button — uses the shared CloseIconButton primitive (Story A.3)
-            so every dismissible surface has consistent a11y + visual treatment. */}
+            so every dismissible surface has consistent a11y + visual treatment.
+            Story C.1.1 (Sprint 7.1) — the `ariaLabel` now accepts a per-context
+            override via the `closeLabel` prop so screen readers announce the
+            specific dialog being dismissed (WCAG 2.4.6). */}
         <CloseIconButton
           onClose={onClose}
           className="absolute right-4 top-4"
-          ariaLabel="Đóng"
+          ariaLabel={closeLabel}
         />
 
         {/* Body */}

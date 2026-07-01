@@ -625,6 +625,7 @@ export default function CustomerDetailPage() {
         title="Chỉnh sửa khách hàng"
         description={`Cập nhật thông tin hồ sơ ${customer.fullName}`}
         size="xl"
+        closeLabel="Đóng hộp thoại chỉnh sửa khách hàng"
       >
         <div className="p-6">
           <CustomerForm
@@ -651,6 +652,7 @@ export default function CustomerDetailPage() {
         cancelLabel="Hủy"
         variant="warning"
         loading={requesting}
+        closeLabel="Đóng hộp thoại gửi yêu cầu xóa khách hàng"
       />
 
       {/* ── Approve Delete Confirm ─────────────────────────────────────────── */}
@@ -669,6 +671,7 @@ export default function CustomerDetailPage() {
         cancelLabel="Hủy"
         variant="danger"
         loading={approving}
+        closeLabel="Đóng hộp thoại phê duyệt xóa khách hàng"
       />
     </div>
   );

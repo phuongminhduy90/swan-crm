@@ -78,6 +78,7 @@ export default function ServicesPage() {
         title="Thêm dịch vụ mới"
         description="Tạo dịch vụ trong danh mục"
         size="lg"
+        closeLabel="Đóng hộp thoại thêm dịch vụ"
       >
         <div className="p-6">
           <ServiceForm
@@ -95,6 +96,7 @@ export default function ServicesPage() {
         title="Chỉnh sửa dịch vụ"
         description={editing?.name}
         size="lg"
+        closeLabel="Đóng hộp thoại chỉnh sửa dịch vụ"
       >
         {editing && (
           <div className="p-6">

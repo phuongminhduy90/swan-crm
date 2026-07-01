@@ -86,6 +86,7 @@ export default function TreatmentLocationsPage() {
         title="Thêm địa điểm mới"
         description="Tạo địa điểm điều trị hoặc bệnh viện liên kết"
         size="lg"
+        closeLabel="Đóng hộp thoại thêm địa điểm"
       >
         <div className="p-6">
           <LocationForm
@@ -103,6 +104,7 @@ export default function TreatmentLocationsPage() {
         title="Chỉnh sửa địa điểm"
         description={editing?.name}
         size="lg"
+        closeLabel="Đóng hộp thoại chỉnh sửa địa điểm"
       >
         {editing && (
           <div className="p-6">

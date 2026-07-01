@@ -152,7 +152,7 @@ export function AttachmentUploadDialog({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Tải lên file đính kèm" size="lg">
+    <Modal open={open} onClose={onClose} title="Tải lên file đính kèm" size="lg" closeLabel="Đóng hộp thoại tải lên file đính kèm">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         {/* File drop zone */}
         <div>

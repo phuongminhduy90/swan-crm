@@ -195,6 +195,11 @@ export function LocationListTable({ refresh, onEdit }: Props) {
         loading={deactivating}
         onConfirm={handleDeactivate}
         onClose={() => setConfirmDeactivate(null)}
+        closeLabel={
+          confirmDeactivate?.active
+            ? 'Đóng hộp thoại ngừng địa điểm'
+            : 'Đóng hộp thoại kích hoạt địa điểm'
+        }
       />
     </div>
   );

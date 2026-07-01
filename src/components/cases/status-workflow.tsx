@@ -292,6 +292,7 @@ export function StatusWorkflow({
           cancelLabel="Hủy"
           loading={loading || !!transitioningTo}
           confirmDisabled={!procedureDate}
+          closeLabel="Đóng hộp thoại hoàn thành thủ thuật"
           description={
             <div className="space-y-3 text-left">
               <p className="text-sm text-gray-600">
@@ -392,6 +393,7 @@ export function StatusWorkflow({
           }
           onConfirm={handleConfirm}
           onClose={() => setConfirmTarget(null)}
+          closeLabel="Đóng hộp thoại xác nhận chuyển trạng thái"
         />
       )}
     </div>

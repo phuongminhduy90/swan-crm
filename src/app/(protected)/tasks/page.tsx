@@ -103,6 +103,7 @@ export default function TasksPage() {
         title="Tạo công việc mới"
         description="Điền thông tin để tạo công việc và giao cho thành viên"
         size="md"
+        closeLabel="Đóng hộp thoại tạo công việc"
       >
         <TaskForm
           onSubmit={handleSubmit}

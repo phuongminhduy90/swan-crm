@@ -368,6 +368,7 @@ export function CustomerList({ refresh, onEdit }: Props) {
         cancelLabel="Hủy"
         variant="warning"
         loading={requesting}
+        closeLabel="Đóng hộp thoại gửi yêu cầu xóa khách hàng"
       />
 
       {/* Approve Delete Dialog (for CS/CEO/master_sales) */}
@@ -386,6 +387,7 @@ export function CustomerList({ refresh, onEdit }: Props) {
         cancelLabel="Hủy"
         variant="danger"
         loading={approving}
+        closeLabel="Đóng hộp thoại phê duyệt xóa khách hàng"
       />
 
       {/* Reject Delete Dialog */}
@@ -403,6 +405,7 @@ export function CustomerList({ refresh, onEdit }: Props) {
         cancelLabel="Hủy"
         variant="info"
         loading={rejecting}
+        closeLabel="Đóng hộp thoại từ chối yêu cầu xóa"
       />
     </div>
   );

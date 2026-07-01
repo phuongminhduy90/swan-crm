@@ -66,6 +66,7 @@ export function PaymentConfirmDialog({ payment, onConfirm, onReject, onClose }: 
       title="Xử lý yêu cầu thanh toán"
       description="Xem xét và xác nhận hoặc từ chối giao dịch thanh toán"
       size="md"
+      closeLabel="Đóng hộp thoại xử lý yêu cầu thanh toán"
     >
       <div className="p-6 space-y-6">
         {/* Payment Summary */}

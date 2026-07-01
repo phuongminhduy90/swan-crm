@@ -161,6 +161,7 @@ export function ServiceListTable({ refresh, onEdit }: Props) {
         loading={deactivating}
         onConfirm={handleDeactivate}
         onClose={() => setConfirmDeactivate(null)}
+        closeLabel="Đóng hộp thoại ngừng dịch vụ"
       />
     </div>
   );

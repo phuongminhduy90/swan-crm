@@ -39,6 +39,16 @@ interface ConfirmDialogProps {
    * is rendered as non-interactive and `onConfirm` is never invoked.
    */
   confirmDisabled?: boolean;
+  /**
+   * Story C.1.1 (Sprint 7.1) — per-context `aria-label` for the close icon
+   * button in the top-right corner. Forwards to the underlying `<Modal>`,
+   * which renders `<CloseIconButton>`. Defaults to the generic Vietnamese
+   * "Đóng" so existing consumers stay backwards-compatible.
+   *
+   * Recommended copy is the action being confirmed, e.g.
+   * "Đóng xác nhận xóa khách hàng".
+   */
+  closeLabel?: string;
 }
 
 const VARIANT_TONE: Record<ConfirmDialogVariant, {
@@ -78,11 +88,22 @@ export function ConfirmDialog({
   variant = 'danger',
   loading = false,
   confirmDisabled = false,
+  closeLabel,
 }: ConfirmDialogProps) {
   const tone = VARIANT_TONE[variant];
   // Info uses an "info" glyph; warning + danger both signal "caution" and
   // share the triangle visual with different palette colors.
   const Icon = variant === 'info' ? Info : AlertTriangle;
+
+  // Story C.1.1 (Sprint 7.1) — when the consumer does not pass a per-context
+  // `closeLabel`, synthesize one from the dialog's `title` so the screen
+  // reader still gets meaningful context. Falls back to the Modal default
+  // ("Đóng") only when both pieces are missing.
+  const resolvedCloseLabel =
+    closeLabel ??
+    (title
+      ? `Đóng xác nhận — ${title.replace(/\?$/, '').trim()}`
+      : undefined);
 
   return (
     // The title is forwarded to `Modal` so the dialog panel automatically
@@ -90,7 +111,15 @@ export function ConfirmDialog({
     // The body content (icon + description + buttons) is provided as
     // children — `description` itself is a ReactNode so it can host
     // arbitrary rich content (date inputs, checklist summaries, etc).
-    <Modal open={open} onClose={onClose} size="sm" title={title}>
+    // Story C.1.1 (Sprint 7.1) — `closeLabel` flows through `<Modal>` →
+    // `<CloseIconButton>` so screen readers announce the specific dialog.
+    <Modal
+      open={open}
+      onClose={onClose}
+      size="sm"
+      title={title}
+      {...(resolvedCloseLabel !== undefined ? { closeLabel: resolvedCloseLabel } : {})}
+    >
       <div className={`p-6 text-center ring-inset ${tone.panelRing}`}>
         <div className={`mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl ${tone.iconBg} animate-scale-in`}>
           <Icon className={`h-7 w-7 ${tone.iconColor}`} aria-hidden="true" />

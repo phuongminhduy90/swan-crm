@@ -111,6 +111,7 @@ export default function CustomersPage() {
         title="Thêm khách hàng mới"
         description="Tạo hồ sơ khách hàng trong hệ thống"
         size="xl"
+        closeLabel="Đóng hộp thoại thêm khách hàng"
       >
         <div className="p-6">
           <CustomerForm
@@ -128,6 +129,7 @@ export default function CustomersPage() {
         title="Chỉnh sửa khách hàng"
         description={editing?.fullName}
         size="xl"
+        closeLabel="Đóng hộp thoại chỉnh sửa khách hàng"
       >
         {editing && (
           <div className="p-6">

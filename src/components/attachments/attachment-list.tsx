@@ -271,6 +271,7 @@ export function AttachmentList({
         confirmLabel="Xóa file"
         variant="danger"
         loading={deleting}
+        closeLabel="Đóng hộp thoại xóa file đính kèm"
       />
     </>
   );

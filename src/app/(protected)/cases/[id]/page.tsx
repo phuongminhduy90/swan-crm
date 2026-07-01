@@ -776,7 +776,7 @@ export default function CaseDetailPage() {
         </Card>
       )}
 
-      <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Chỉnh sửa hồ sơ CASE" description={`Cập nhật ${caseRecord.caseCode}`} size="lg">
+      <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Chỉnh sửa hồ sơ CASE" description={`Cập nhật ${caseRecord.caseCode}`} size="lg" closeLabel="Đóng hộp thoại chỉnh sửa hồ sơ">
         <form onSubmit={handleEditSubmit} className="space-y-4 p-6">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Select label="Ưu tiên" name="priority" defaultValue={caseRecord.priority}>
@@ -804,7 +804,7 @@ export default function CaseDetailPage() {
         </form>
       </Modal>
 
-      <Modal open={serviceModalOpen} onClose={() => { setServiceModalOpen(false); setServiceError(null); resetServiceForm(); }} title="Thêm dịch vụ" size="lg">
+      <Modal open={serviceModalOpen} onClose={() => { setServiceModalOpen(false); setServiceError(null); resetServiceForm(); }} title="Thêm dịch vụ" size="lg" closeLabel="Đóng hộp thoại thêm dịch vụ">
         {serviceError && <div className="mx-6 mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{serviceError}</div>}
         <form onSubmit={handleSubmitService(onAddService)} className="space-y-4 p-6">
           <Input label="Tên dịch vụ *" error={serviceErrors.serviceName?.message} {...regService('serviceName')} placeholder="Nhập tên dịch vụ..." />
@@ -832,7 +832,7 @@ export default function CaseDetailPage() {
         </form>
       </Modal>
 
-      <Modal open={paymentOpen} onClose={() => setPaymentOpen(false)} title="Tạo thanh toán" size="lg">
+      <Modal open={paymentOpen} onClose={() => setPaymentOpen(false)} title="Tạo thanh toán" size="lg" closeLabel="Đóng hộp thoại tạo thanh toán">
         <PaymentForm
           caseId={caseId}
           customerId={caseRecord.customerId}
@@ -855,7 +855,7 @@ export default function CaseDetailPage() {
         />
       </Modal>
 
-      <Modal open={staffEditOpen} onClose={() => setStaffEditOpen(false)} title="Chỉnh sửa phân công" size="lg">
+      <Modal open={staffEditOpen} onClose={() => setStaffEditOpen(false)} title="Chỉnh sửa phân công" size="lg" closeLabel="Đóng hộp thoại chỉnh sửa phân công">
         <StaffAssignmentForm
           staff={staffAssignment}
           allUsers={allUsers}
@@ -895,6 +895,7 @@ export default function CaseDetailPage() {
         cancelLabel="Hủy"
         variant="danger"
         loading={removeServiceSubmitting}
+        closeLabel="Đóng hộp thoại xác nhận xóa dịch vụ"
       />
     </div>
   );
