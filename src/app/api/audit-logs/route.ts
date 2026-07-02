@@ -11,6 +11,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const entityType = searchParams.get('entityType');
+    const entityId = searchParams.get('entityId');
     const action = searchParams.get('action');
     const actorSearch = searchParams.get('actorSearch');
     const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10));
@@ -20,6 +21,13 @@ export async function GET(request: NextRequest) {
 
     if (entityType) {
       logs = logs.filter((l) => l.entityType === entityType);
+    }
+    // Story PI-3 (Sprint 7.2) — entityId filter so the payments page
+    // can deep-link a single payment row to its audit history. Without
+    // this filter, accountants had to scroll through every payment
+    // audit entry to find the one for a specific payment.
+    if (entityId) {
+      logs = logs.filter((l) => l.entityId === entityId);
     }
     if (action) {
       logs = logs.filter((l) => l.action === action);

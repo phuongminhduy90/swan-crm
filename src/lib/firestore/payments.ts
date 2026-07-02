@@ -73,6 +73,40 @@ export async function confirmPayment(
   if (!payment) throw new Error('Không tìm thấy thanh toán');
   if (payment.status !== 'pending') throw new Error('Thanh toán không ở trạng thái chờ xác nhận');
 
+  // Story F-CRIT-08 (Sprint 7.2) — When the PAYMENT_TX flag is enabled, the
+  // confirm flow is wrapped in a Firestore transaction (real mode) or
+  // a mock-store BEGIN/COMMIT/ROLLBACK simulator (dev mode). The
+  // transaction covers three writes atomically: payment status update,
+  // case bill recompute, audit log entry. A failure at any stage rolls
+  // back the entire transaction so the financial state stays consistent.
+  //
+  // When the flag is OFF, we fall through to the legacy two-step path
+  // (payment update + recalculateCasePayment) — preserved exactly as in
+  // Sprint 6.4 so production runs identical until C-6 + C-7 + C-8
+  // accountant pairing signs off and the flag is promoted to ON.
+  if (isFlagEnabled('PAYMENT_TX')) {
+    const { confirmPaymentTransaction } = await import('@/lib/payments/transaction');
+    await confirmPaymentTransaction(
+      {
+        paymentId,
+        confirmedBy: input.confirmedBy,
+        note: input.note,
+        expectedPreviousStatus: 'pending',
+        preCaseRecord: {
+          id: payment.caseId,
+          totalBillAfterDiscount: 0, // refreshed inside the transaction
+        },
+      },
+      // The API route is the caller; the actor's `displayName` and
+      // `role` are passed through the input above (Sprint 7.2 keeps
+      // the existing function signature stable for backward compat).
+      // For a richer actor object the route can call
+      // `confirmPaymentTransaction` directly.
+      { uid: updatedBy, displayName: updatedBy, role: 'admin' },
+    );
+    return;
+  }
+
   const now = new Date().toISOString();
   await updateDocument(COLLECTION, paymentId, {
     status: 'confirmed',

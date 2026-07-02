@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { confirmPayment, getPayment } from '@/lib/firestore/payments';
 import { confirmPaymentSchema } from '@/lib/validators/payment';
 import { writeAuditLog } from '@/lib/firestore/audit';
+import { writePaymentAudit } from '@/lib/audit/payment-audit';
 import { triggerPaymentConfirmedNotification } from '@/lib/notifications/trigger';
 import { getCase } from '@/lib/firestore/cases';
 import { requirePermission, isErrorResponse } from '@/lib/api/auth';
@@ -81,18 +82,21 @@ export async function PATCH(
 
     if (isFlagEnabled('PAYMENT_SOD') && existing.createdBy === user.uid) {
       // Audit log for the denied attempt — same action type as a successful
-      // confirmation so SOC filters surface it, with `denied: true` and a
-      // human-readable reason so reviewers can distinguish attempts from
-      // successes at a glance.
-      await writeAuditLog({
-        actorId: user.uid,
-        actorName: user.displayName,
-        actorRole: user.role,
+      // confirmation so SOC filters surface it. PI-3 (Sprint 7.2) enriches
+      // the payload with a structured diff (status + createdBy) so auditors
+      // see WHY the attempt was blocked without parsing raw JSON.
+      await writePaymentAudit({
         action: 'payment_confirmed',
-        entityType: 'payment',
         entityId: params.id,
-        before: { status: existing.status, createdBy: existing.createdBy },
-        after: {
+        actor: {
+          uid: user.uid,
+          displayName: user.displayName,
+          role: user.role,
+        },
+        before: existing,
+        caseId: existing.caseId,
+        trigger: 'SoD self-confirm blocked',
+        metadata: {
           denied: true,
           reason: 'sod_violation',
           attemptedBy: user.uid,
@@ -108,17 +112,100 @@ export async function PATCH(
       );
     }
 
+    // Story F-CRIT-08 (Sprint 7.2) — Transactional path. When the
+    // PAYMENT_TX flag is enabled, route the confirm through
+    // `confirmPaymentTransaction` so the payment status update, the
+    // case bill recompute, and the audit log entry are committed
+    // atomically. The transactional helper writes its own
+    // `payment_transaction_committed` audit log entry, so the
+    // legacy `payment_confirmed` writeAuditLog below is skipped.
+    if (isFlagEnabled('PAYMENT_TX')) {
+      const { confirmPaymentTransaction, TransactionAbortError } = await import(
+        '@/lib/payments/transaction'
+      );
+
+      try {
+        await confirmPaymentTransaction(
+          {
+            paymentId: params.id,
+            confirmedBy: data.confirmedBy,
+            note: data.note,
+            expectedPreviousStatus: 'pending',
+            preCaseRecord: {
+              id: existing.caseId,
+              totalBillAfterDiscount: 0,
+            },
+          },
+          {
+            uid: user.uid,
+            displayName: user.displayName,
+            role: user.role,
+          },
+        );
+      } catch (txErr) {
+        if (txErr instanceof TransactionAbortError) {
+          if (txErr.code === 'payment_not_found') {
+            return NextResponse.json({ error: txErr.message }, { status: 404 });
+          }
+          if (txErr.code === 'payment_already_processed') {
+            return NextResponse.json({ error: txErr.message }, { status: 409 });
+          }
+          if (txErr.code === 'case_not_found') {
+            return NextResponse.json({ error: txErr.message }, { status: 404 });
+          }
+          // write_failed — fall through to the 500 handler.
+          console.error('Payment transaction aborted:', txErr);
+        } else {
+          console.error('Payment transaction error:', txErr);
+        }
+        return NextResponse.json(
+          {
+            error: 'Không thể xác nhận thanh toán: giao dịch đã bị hủy',
+          },
+          { status: 500 },
+        );
+      }
+
+      // Fire-and-forget: trigger payment confirmed notification
+      try {
+        if (existing.caseId) {
+          const caseRecord = await getCase(existing.caseId);
+          if (caseRecord) {
+            triggerPaymentConfirmedNotification(existing, caseRecord);
+          }
+        }
+      } catch {
+        // ignore notification errors
+      }
+
+      return NextResponse.json({ success: true });
+    }
+
+    // Legacy non-transactional path (PAYMENT_TX flag OFF).
     await confirmPayment(params.id, data, user.uid);
 
-    await writeAuditLog({
-      actorId: user.uid,
-      actorName: user.displayName,
-      actorRole: user.role,
+    // Story PI-3 (Sprint 7.2) — enriched audit payload with structured
+    // diff, state transition, and caseId link. The `after` record is the
+    // post-confirm payment state; `before` is the pre-confirm snapshot
+    // we already read.
+    await writePaymentAudit({
       action: 'payment_confirmed',
-      entityType: 'payment',
       entityId: params.id,
-      before: { status: existing.status, createdBy: existing.createdBy },
-      after: { confirmedBy: data.confirmedBy, note: data.note ?? '' },
+      actor: {
+        uid: user.uid,
+        displayName: user.displayName,
+        role: user.role,
+      },
+      before: existing,
+      after: {
+        ...existing,
+        status: 'confirmed',
+        confirmedBy: data.confirmedBy,
+        confirmedAt: new Date().toISOString(),
+        note: data.note ?? existing.note,
+      },
+      caseId: existing.caseId,
+      trigger: 'PI-3 legacy confirm',
     });
 
     // Fire-and-forget: trigger payment confirmed notification

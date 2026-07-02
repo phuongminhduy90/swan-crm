@@ -48,7 +48,38 @@ export type AuditAction =
    * billHash). Auditors use this to trace every bill-state change back to a
    * single source-of-truth recompute.
    */
-  | 'bill_recomputed';
+  | 'bill_recomputed'
+  /**
+   * Story F-CRIT-08 (Sprint 7.2) — A payment confirmation transaction was
+   * COMMITTED successfully. The transaction wraps three writes in a single
+   * atomic batch: (1) payment.status → 'confirmed' with confirmedBy/confirmedAt,
+   * (2) case.amountPaid/remainingAmount/paymentStatus recomputed from the
+   * full payment history, and (3) a `payment_transaction_committed` audit log
+   * entry. All three writes succeed or all three are rolled back. The
+   * `before` payload carries the pre-transaction payment + case snapshot;
+   * `after` carries the post-transaction payment + case snapshot. The
+   * `caseId` is also included in `after` for fast filtering.
+   *
+   * Written by: `confirmPaymentTransaction` in `@/lib/payments/transaction.ts`
+   * (gated by `NEXT_PUBLIC_FEATURE_PAYMENT_TX`).
+   */
+  | 'payment_transaction_committed'
+  /**
+   * Story F-CRIT-08 (Sprint 7.2) — A payment confirmation transaction was
+   * ABORTED. The transaction failed at one of its three writes (e.g. case
+   * recompute failure, audit log write failure) and the entire transaction
+   * was rolled back so no partial state was persisted. The payment remains
+   * in `pending`; the case amounts were not mutated. The `before` payload
+   * carries the payment record that was about to be confirmed; `after`
+   * carries `{ aborted: true, reason: <error message>, stage: <payment|case|audit> }`.
+   * Auditors use this entry to detect confirmation failures that did not
+   * result in a successful `payment_transaction_committed` entry for the
+   * same payment within the same window.
+   *
+   * Written by: `confirmPaymentTransaction` in `@/lib/payments/transaction.ts`
+   * (gated by `NEXT_PUBLIC_FEATURE_PAYMENT_TX`).
+   */
+  | 'payment_transaction_aborted';
 
 export type AuditEntityType =
   | 'customer'

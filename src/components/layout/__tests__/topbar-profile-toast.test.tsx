@@ -104,6 +104,7 @@ beforeEach(() => {
   pushMock.mockReset();
   toastMock.mockReset();
   setDevRoleMock.mockReset();
+  fetchMock.mockClear();
   mockUseAuth.mockReturnValue({
     userProfile: makeUser(),
     isDevMode: false,
@@ -235,6 +236,46 @@ describe('Topbar — profile placeholder toast (Story 6.3.4 / B.4.4)', () => {
 
       await waitFor(() => expect(toastMock).toHaveBeenCalledTimes(2));
       expect(toastMock).toHaveBeenNthCalledWith(2, 'Tính năng đang phát triển', 'info');
+    });
+  });
+
+  describe('TD-7 / PI-5 — FALLBACK_USER_ID no longer matches A2 anti-pattern', () => {
+    it('falls back to "placeholder" when userProfile is null (no A2 regex match)', async () => {
+      fetchMock.mockClear();
+      mockUseAuth.mockReturnValue({
+        userProfile: null,
+        isDevMode: false,
+        setDevRole: setDevRoleMock,
+        devRole: 'admin',
+      });
+      renderTopbar();
+
+      // Wait for the polling effect to fire (renderTopbar wraps the initial
+      // mount in act(), then the setInterval may also have fired).
+      await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+
+      // Inspect the FIRST call from this render — preceding tests may have
+      // populated fetchMock, so we filter by URL pattern instead of index.
+      const placeholderCall = fetchMock.mock.calls.find((c) => {
+        const url = c[0] as string | undefined;
+        return typeof url === 'string' && url.startsWith('/api/notifications');
+      });
+      expect(placeholderCall).toBeDefined();
+      const url = placeholderCall?.[0] as string;
+      expect(url).toContain('userId=placeholder');
+      expect(url).not.toContain('userId=user-001');
+    });
+
+    it('does NOT render the literal string "user-001" anywhere in the Topbar DOM', () => {
+      fetchMock.mockClear();
+      mockUseAuth.mockReturnValue({
+        userProfile: null,
+        isDevMode: false,
+        setDevRole: setDevRoleMock,
+        devRole: 'admin',
+      });
+      const { container } = renderTopbar();
+      expect(container.innerHTML).not.toContain('user-001');
     });
   });
 

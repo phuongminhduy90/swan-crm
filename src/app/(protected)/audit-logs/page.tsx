@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   FileText, ChevronDown, ChevronRight, Loader2, UserPlus, Edit,
   FolderPlus, ArrowRightLeft, DollarSign, Upload, Shield,
@@ -120,6 +121,22 @@ const AUDIT_ACTION_LABELS: Record<AuditAction, { label: string; icon: React.Elem
    * paymentStatus, totalBillAfterDiscount, billHash).
    */
   bill_recomputed: { label: 'Đồng bộ hóa bill', icon: RefreshCw, color: 'text-swan-600 bg-swan-50' },
+  /**
+   * Story F-CRIT-08 (Sprint 7.2) — a payment confirmation transaction was
+   * committed atomically. The audit entry carries before/after snapshots of
+   * the payment AND the case (amountPaid, remainingAmount, paymentStatus).
+   * Auditors can verify the financial state at commit time from a single
+   * entry.
+   */
+  payment_transaction_committed: { label: 'Giao dịch xác nhận thanh toán (commit)', icon: CheckCircle2, color: 'text-emerald-600 bg-emerald-50' },
+  /**
+   * Story F-CRIT-08 (Sprint 7.2) — a payment confirmation transaction was
+   * aborted (rolled back). The audit entry's `after` payload carries the
+   * failure reason and which stage (payment, case, audit) rejected the
+   * commit. Auditors should reconcile this with a missing
+   * `payment_transaction_committed` entry for the same payment.
+   */
+  payment_transaction_aborted: { label: 'Giao dịch xác nhận thanh toán (hủy)', icon: AlertTriangle, color: 'text-red-600 bg-red-50' },
 };
 
 const ENTITY_TYPE_LABELS: Record<AuditEntityType | 'all', string> = {
@@ -140,6 +157,14 @@ const ENTITY_TYPE_LABELS: Record<AuditEntityType | 'all', string> = {
 
 export default function AuditLogsPage() {
   const { toast } = useToast();
+  const searchParams = useSearchParams();
+  // Story PI-3 (Sprint 7.2) — honor ?entityId=<id> from the payments
+  // page deep link. When present, lock entityType to 'payment' and
+  // surface a "Xóa bộ lọc" chip so the accountant can escape back to
+  // the global log view.
+  const urlEntityId = searchParams?.get('entityId') ?? null;
+  const isDeepLinked = urlEntityId !== null;
+
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
@@ -148,7 +173,20 @@ export default function AuditLogsPage() {
   const [entityType, setEntityType] = useState<string>('all');
   const [action, setAction] = useState<string>('all');
   const [actorSearch, setActorSearch] = useState('');
+  const [entityId, setEntityId] = useState<string>('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  // Apply the deep-link entityId on first mount. Once the user changes
+  // a filter manually, the deep-link state is dropped (so they can
+  // escape the link without a forced re-apply).
+  useEffect(() => {
+    if (isDeepLinked) {
+      setEntityId(urlEntityId);
+      setEntityType('payment');
+    }
+    // We intentionally only run on mount — see comment above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -160,6 +198,10 @@ export default function AuditLogsPage() {
         pageSize: pageSize.toString(),
       });
       if (entityType !== 'all') params.set('entityType', entityType);
+      // Story PI-3 — propagate the entityId filter to the API so the
+      // deep-link from the payments page lands directly on the right
+      // entry list.
+      if (entityId) params.set('entityId', entityId);
       if (action !== 'all') params.set('action', action);
       if (actorSearch) params.set('actorSearch', actorSearch);
 
@@ -175,7 +217,7 @@ export default function AuditLogsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, entityType, action, actorSearch, toast]);
+  }, [page, pageSize, entityType, entityId, action, actorSearch, toast]);
 
   useEffect(() => {
     load();
@@ -184,7 +226,7 @@ export default function AuditLogsPage() {
   // Reset page when filters change
   useEffect(() => {
     setPage(1);
-  }, [entityType, action, actorSearch]);
+  }, [entityType, entityId, action, actorSearch]);
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -232,6 +274,29 @@ export default function AuditLogsPage() {
               placeholder="Tên hoặc vai trò..."
             />
           </div>
+        </div>
+        {/* Story PI-3 (Sprint 7.2) — entityId filter so the payments
+            page can deep-link a single payment row to its audit
+            history. When populated, a clear-filter chip appears next
+            to the input. */}
+        <div className="mt-3 flex items-center gap-2">
+          <input
+            type="text"
+            value={entityId}
+            onChange={(e) => setEntityId(e.target.value)}
+            placeholder="Lọc theo entityId (vd: pay-001)"
+            className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 placeholder:text-gray-400 focus:border-swan-400 focus:outline-none focus:ring-2 focus:ring-swan-100"
+            aria-label="Lọc audit log theo entityId"
+          />
+          {entityId && (
+            <button
+              type="button"
+              onClick={() => setEntityId('')}
+              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100"
+            >
+              Xóa bộ lọc
+            </button>
+          )}
         </div>
       </Card>
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { CheckCircle, XCircle, Clock, RefreshCw, ShieldAlert } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, RefreshCw, ShieldAlert, FileSearch } from 'lucide-react';
 import { Payment, User } from '@/lib/types';
 import {
   getAllPayments,
@@ -217,6 +217,28 @@ export function PaymentList({ caseId, statusFilter, paymentTypeFilter, refresh }
       key: 'status',
       header: 'Trạng thái',
       render: (row: Payment) => statusBadge(row.status),
+    },
+    /**
+     * Story PI-3 (Sprint 7.2) — deep link to the per-payment audit
+     * history. Every payment row shows the link (not gated by `canApprove`
+     * because audit reading is a separate `audit:read` permission that
+     * most roles — including sales + accountant + media — already
+     * hold). The destination is `/audit-logs?entityId=<row.id>` so the
+     * audit-logs page opens pre-filtered to this payment's history.
+     */
+    {
+      key: 'audit',
+      header: 'Lịch sử',
+      render: (row: Payment) => (
+        <a
+          href={`/audit-logs?entityId=${encodeURIComponent(row.id)}`}
+          className="inline-flex items-center gap-1 text-xs font-medium text-swan-700 hover:text-swan-800 hover:underline"
+          title="Xem lịch sử thay đổi thanh toán này"
+        >
+          <FileSearch className="h-3 w-3" />
+          Xem
+        </a>
+      ),
     },
     ...(canApprove
       ? [

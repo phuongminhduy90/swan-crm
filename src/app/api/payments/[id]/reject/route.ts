@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { rejectPayment } from '@/lib/firestore/payments';
+import { rejectPayment, getPayment } from '@/lib/firestore/payments';
 import { writeAuditLog } from '@/lib/firestore/audit';
+import { writePaymentAudit } from '@/lib/audit/payment-audit';
 import { requirePermission, isErrorResponse } from '@/lib/api/auth';
 
 const rejectSchema = z.object({
@@ -20,17 +21,45 @@ export async function PATCH(
     const body = await request.json();
     const data = rejectSchema.parse(body);
 
+    // Story PI-3 (Sprint 7.2) — read the pre-reject record so the audit
+    // entry carries a structured diff (status + note + rejectedAt). This
+    // mirrors the F-CRIT-08 confirm-route pattern and gives auditors a
+    // consistent diff shape across payment-state transitions.
+    const before = await getPayment(params.id);
+
     await rejectPayment(params.id, data.note, user.uid);
 
-    await writeAuditLog({
-      actorId: user.uid,
-      actorName: user.displayName,
-      actorRole: user.role,
-      action: 'payment_rejected',
-      entityType: 'payment',
-      entityId: params.id,
-      after: { note: data.note },
-    });
+    if (before) {
+      await writePaymentAudit({
+        action: 'payment_rejected',
+        entityId: params.id,
+        actor: {
+          uid: user.uid,
+          displayName: user.displayName,
+          role: user.role,
+        },
+        before,
+        after: {
+          ...before,
+          status: 'rejected',
+          note: data.note,
+        },
+        caseId: before.caseId,
+        trigger: 'PI-3 reject',
+      });
+    } else {
+      // Fallback: pre-reject record was missing — preserve the legacy
+      // flat shape so the audit trail never silently disappears.
+      await writeAuditLog({
+        actorId: user.uid,
+        actorName: user.displayName,
+        actorRole: user.role,
+        action: 'payment_rejected',
+        entityType: 'payment',
+        entityId: params.id,
+        after: { note: data.note },
+      });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

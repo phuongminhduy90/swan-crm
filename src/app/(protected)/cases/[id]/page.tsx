@@ -563,10 +563,13 @@ export default function CaseDetailPage() {
                     }
                   }
 
-                  // Story B.2.4 — when transitioning to `procedure_completed`,
-                  // persist the captured `actualProcedureDate` to the case
-                  // BEFORE flipping the status. This makes the date the
-                  // source of truth for D1–D90 followup scheduling.
+                  // Story B.2.4 + Story PI-4 (Sprint 7.2) — when
+                  // transitioning to `procedure_completed`, persist the
+                  // captured `actualProcedureDate` to the case BEFORE
+                  // flipping the status. This makes the date the source of
+                  // truth for D1–D90 followup scheduling; the server-side
+                  // status route honours the same priority order via
+                  // `resolveProcedureDateForFollowups`.
                   let procedureDateForFollowups: Date | undefined;
                   if (newStatus === 'procedure_completed') {
                     const captured = extra?.actualProcedureDate;

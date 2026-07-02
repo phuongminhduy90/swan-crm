@@ -6,6 +6,7 @@ import { triggerPaymentPendingNotification } from '@/lib/notifications/trigger';
 import { getCase } from '@/lib/firestore/cases';
 import { getCustomer } from '@/lib/firestore/customers';
 import { requirePermission, isErrorResponse } from '@/lib/api/auth';
+import { writePaymentAudit } from '@/lib/audit/payment-audit';
 
 export async function GET(request: NextRequest) {
   try {
@@ -37,6 +38,26 @@ export async function POST(request: NextRequest) {
     const data = createPaymentSchema.parse(body);
 
     const payment = await createPayment(data, user.uid);
+
+    // Story PI-3 (Sprint 7.2) — enriched audit log for newly created
+    // payments. The previous implementation did not write any audit
+    // entry on payment creation (the only way to trace a payment back
+    // to its creator was the `createdBy` field on the record itself).
+    // PI-3 makes the creation visible in the audit trail with the
+    // standard enriched payload (state transition none → pending,
+    // caseId link, trigger).
+    await writePaymentAudit({
+      action: 'payment_created',
+      entityId: payment.id,
+      actor: {
+        uid: user.uid,
+        displayName: user.displayName,
+        role: user.role,
+      },
+      after: payment,
+      caseId: payment.caseId,
+      trigger: 'PI-3 payment create',
+    });
 
     // Fire-and-forget: trigger payment pending notification
     try {

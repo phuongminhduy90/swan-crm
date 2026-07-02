@@ -21,6 +21,7 @@
 #   A2  | Raw user-* IDs in UI                     | user-\d{3}                               | src/components
 #   A8  | Dead `href="#"` links                    | href=["']#["']                           | src/components
 #   A9  | Native window.confirm / window.alert     | window\.(confirm|alert)                  | src
+#   A10 | Raw <input type="number"> for currency   | <[iI]nput[^>]*(type=['"]number['"])[^>]*(currency|amount|price|VNĐ|tiền) | src/components
 #   ESC | eslint-disable for no-alert              | eslint-disable[^"']*no-alert             | src
 #
 # Exclusions:
@@ -139,24 +140,28 @@ CATALOG_IDS=(
   "A2"
   "A8"
   "A9"
+  "A10"
   "ESC"
 )
 CATALOG_DESCS=(
   "raw user-* IDs in UI"
   'dead href="#" links'
   "native window.confirm / window.alert"
+  "raw <input type=\"number\"> for currency (use <CurrencyInput>)"
   "eslint-disable directive for no-alert"
 )
 CATALOG_REGEXES=(
   'user-[[:digit:]]{3}'
   'href=["'"'"']#["'"'"']'
   'window\.(confirm|alert)[[:space:]]*\('
+  '<[iI]nput[^>]*(type=["'"'"']number["'"'"'])[^>]*(currency|amount|price|VNĐ|tiền)'
   'eslint-disable[^"'"'"']*no-alert'
 )
 CATALOG_SCOPES=(
   "src/components"
   "src/components"
   "src"
+  "src/components"
   "src"
 )
 

@@ -164,18 +164,25 @@ Toàn bộ commit — kể từ Sprint 7.1 close — phải vượt qua
 
 ### 3.1 Anti-pattern catalog
 
-Script kiểm tra **4 nhóm** anti-pattern (đã đóng ở Sprint 6.x, kẻ cũ tái xâm nhập = regression):
+Script kiểm tra **5 nhóm** anti-pattern (đã đóng ở Sprint 6.x / 7.x, kẻ cũ tái xâm nhập = regression):
 
 | ID  | Mô tả                                | Regex                                          | Phạm vi           |
 |:----|:-------------------------------------|:-----------------------------------------------|:------------------|
 | A2  | Raw `user-*` IDs trong UI            | `user-\d{3}`                                   | `src/components`  |
 | A8  | Dead `href="#"` links                | `href=["']#["']`                               | `src/components`  |
 | A9  | Native `window.confirm` / `alert`    | `window\.(confirm\|alert)\s*\(`                | `src`             |
+| A10 | Raw `<input type="number">` cho tiền | `<[iI]nput[^>]*(type=['"]number['"])[^>]*(currency\|amount\|price\|VNĐ\|tiền)` | `src/components`  |
 | ESC | `eslint-disable` cho `no-alert`      | `eslint-disable[^"']*no-alert`                 | `src`             |
 
 **Ngoại lệ:** comment-only line (`// ...`, `/* ... */`, `* ...`) được bỏ qua để tránh false-positive trên docs/documentation comments — ví dụ `// thay thế window.alert bằng <Toast>` không trigger.
 
 **Ngoại lệ khác:** `__tests__/`, `*.test.*`, `*.spec.*`, `.next/`, `node_modules/`, `playwright-report/`.
+
+**Lưu ý A10 (Sprint 7.2 PI-5):**
+
+- `<input type="number">` cho trường tiền tệ dễ bị sai do locale (VN accountant gõ `1,500,000` bị coerce thành `1.5`).
+- Phải dùng `<CurrencyInput>` từ `@/components/ui/currency-input` (primitive ra mắt ở C.2.1 Sprint 7.2).
+- A10 chỉ match trên cùng 1 dòng (`[^>]*` không span newline). Các input multi-line `<input\n  type="number"\n  ...>` KHÔNG bị match bởi gate — đây là tính năng cố ý để tránh chặn code đa dòng trong khi C.2.1 chưa migrate xong. Sprint 7.2 day 1–2 sẽ migrate toàn bộ call sites sang `<CurrencyInput>` (riêng story C.2.1, ngoài phạm vi PI-5).
 
 ### 3.2 Chạy thủ công
 
@@ -251,10 +258,11 @@ git commit --no-verify -m "fix(payments): hotfix production"
 ### 3.5 Khi anti-pattern được phát hiện
 
 1. **Đọc pattern ID + file:line** trong output của script.
-2. **Sửa tại nguồn** (đây là regression của Sprint 6.x closures):
+2. **Sửa tại nguồn** (đây là regression của Sprint 6.x / 7.x closures):
    - A9 → dùng `<Toast>` / `<ConfirmDialog>` từ `@/components/ui/`.
    - A8 → dùng `<button onClick={...}>` thay cho `<a href="#">` hoặc dùng routing helper.
    - A2 → lấy `displayName` từ user profile, không hard-code `user-NNN`.
+   - A10 → thay raw `<input type="number">` bằng `<CurrencyInput>` từ `@/components/ui/currency-input`. Primitive accept `value: number` + `onChange`, format VND thousand-separator tự động.
    - ESC → xóa comment `eslint-disable no-alert` — anti-pattern A9 đã đóng, không cần escape.
 3. Re-stage + commit bình thường.
 

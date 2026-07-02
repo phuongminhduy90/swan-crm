@@ -17,6 +17,171 @@ export function getCollection(name: string): Collection {
   return store.get(name)!;
 }
 
+/**
+ * Story F-CRIT-08 (Sprint 7.2) — In-memory transaction simulation.
+ *
+ * The mock store has no real Firestore `runTransaction` semantics, but the
+ * transactional confirm path must be tested deterministically. We provide a
+ * shallow deep-clone snapshot of every document the transaction touches,
+ * execute the callback against a write-buffered view, and either apply the
+ * buffer on success (COMMIT) or discard it (ROLLBACK — when the callback
+ * throws).
+ *
+ * Scope and limitations:
+ * - Buffering is per-document; the snapshot is taken on first `tx.get()`.
+ *   Subsequent `tx.get()` calls within the same transaction hit the buffer
+ *   so reads-after-writes see pending state.
+ * - Buffering is shallow: only the documents that the callback `get()`s
+ *   are snapshotted. Other documents in the same collection are untouched.
+ * - Concurrent transactions are NOT supported (the mock is single-threaded);
+ *   the F-CRIT-08 test suite uses sequential calls to verify that the second
+ *   concurrent confirm observes the first's committed state.
+ * - `tx.update()` writes are stored in the buffer and applied at COMMIT.
+ *   If the callback throws, the buffer is discarded and the original
+ *   documents are untouched.
+ *
+ * Real Firestore `runTransaction` provides stronger guarantees (conflict
+ * detection, automatic retry) that this mock does not attempt to emulate.
+ * The mock only needs to verify *all-or-nothing* within a single transaction
+ * — which is what F-CRIT-08 relies on.
+ */
+interface TransactionBuffer {
+  snapshots: Map<string, Map<string, Record<string, unknown>>>; // collection -> docId -> snapshot
+  writes: Map<string, Map<string, Record<string, unknown>>>;      // collection -> docId -> pending data
+}
+
+const activeTx: TransactionBuffer | null = null; // (module-level; per-call to avoid cross-test pollution)
+
+/**
+ * Execute `callback` against a transaction context. On success, the
+ * buffered writes are merged into the real store. On throw, the buffer is
+ * discarded (ROLLBACK) and the store is untouched.
+ *
+ * Mirrors the shape of `firebase-admin`'s `Firestore.runTransaction` —
+ * the callback receives a `tx` object with `get`, `update`, `set`, and
+ * `delete` methods (only the ones F-CRIT-08 uses are implemented).
+ */
+export async function runMockTransaction<T>(
+  callback: (tx: MockTransaction) => Promise<T>,
+): Promise<T> {
+  if (activeTx) {
+    throw new Error('Nested transactions are not supported in the mock store');
+  }
+  const tx = new MockTransaction();
+  try {
+    const result = await callback(tx);
+    // COMMIT — apply buffered writes to the real store
+    for (const [collectionName, docs] of tx.buffer.writes) {
+      const col = getCollection(collectionName);
+      for (const [docId, data] of docs) {
+        col.set(docId, data);
+      }
+    }
+    return result;
+  } catch (err) {
+    // ROLLBACK — buffer is discarded
+    throw err;
+  }
+}
+
+export class MockTransaction {
+  /** First read: snapshot. Subsequent read of same doc: hit the write buffer. */
+  readonly buffer: TransactionBuffer = {
+    snapshots: new Map(),
+    writes: new Map(),
+  };
+
+  private getSnapshotCollection(collectionName: string): Map<string, Record<string, unknown>> {
+    let snaps = this.buffer.snapshots.get(collectionName);
+    if (!snaps) {
+      snaps = new Map();
+      this.buffer.snapshots.set(collectionName, snaps);
+    }
+    return snaps;
+  }
+
+  private getWriteCollection(collectionName: string): Map<string, Record<string, unknown>> {
+    let writes = this.buffer.writes.get(collectionName);
+    if (!writes) {
+      writes = new Map();
+      this.buffer.writes.set(collectionName, writes);
+    }
+    return writes;
+  }
+
+  /**
+   * Read a document inside the transaction. First read snapshots the
+   * current state; subsequent reads of the same doc return the buffered
+   * pending write (reads-after-writes).
+   */
+  async get<T = Record<string, unknown>>(
+    collectionName: string,
+    docId: string,
+  ): Promise<{ id: string; data: T | null; exists: boolean }> {
+    const writes = this.buffer.writes.get(collectionName);
+    if (writes && writes.has(docId)) {
+      // Reads-after-writes — return buffered data so the callback sees
+      // its own writes immediately.
+      return { id: docId, data: writes.get(docId) as T, exists: true };
+    }
+    // First read — snapshot the current state.
+    const snaps = this.getSnapshotCollection(collectionName);
+    if (!snaps.has(docId)) {
+      const col = getCollection(collectionName);
+      const current = col.get(docId);
+      if (current) {
+        // Deep clone via JSON to insulate from subsequent writes.
+        snaps.set(docId, JSON.parse(JSON.stringify(current)) as Record<string, unknown>);
+      } else {
+        snaps.set(docId, undefined as unknown as Record<string, unknown>);
+      }
+    }
+    const snap = snaps.get(docId);
+    return {
+      id: docId,
+      data: (snap ?? null) as T | null,
+      exists: snap !== undefined && snap !== null,
+    };
+  }
+
+  /**
+   * Buffer a partial update to a document. The actual write happens at
+   * COMMIT time. Reads-after-writes within the same transaction see the
+   * buffered state.
+   */
+  update(collectionName: string, docId: string, data: Record<string, unknown>): void {
+    const writes = this.getWriteCollection(collectionName);
+    const existing = writes.has(docId)
+      ? writes.get(docId)!
+      : (() => {
+          // If the doc exists in the snapshot, start the buffer entry
+          // from a clone of the snapshot so subsequent updates merge.
+          const snaps = this.buffer.snapshots.get(collectionName);
+          const snap = snaps?.get(docId);
+          return snap ? JSON.parse(JSON.stringify(snap)) : { id: docId };
+        })();
+    const now = new Date().toISOString();
+    writes.set(docId, { ...existing, ...data, updatedAt: now });
+  }
+
+  /**
+   * Buffer a full document set. Overwrites the entire document.
+   */
+  set(collectionName: string, docId: string, data: Record<string, unknown>): void {
+    const writes = this.getWriteCollection(collectionName);
+    const now = new Date().toISOString();
+    writes.set(docId, { ...data, id: docId, createdAt: data.createdAt ?? now, updatedAt: now });
+  }
+
+  /**
+   * Buffer a document delete.
+   */
+  delete(collectionName: string, docId: string): void {
+    const writes = this.getWriteCollection(collectionName);
+    writes.set(docId, { __deleted: true, id: docId });
+  }
+}
+
 // ── Seed data ──────────────────────────────────────────────
 
 export function initSeedData(): void {

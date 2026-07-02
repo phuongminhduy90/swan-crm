@@ -27,8 +27,17 @@ vi.mock('@/lib/firestore/payments', () => ({
 }));
 
 const mockWriteAuditLog = vi.fn();
-vi.mock('@/lib/firestore/audit', () => ({
+vi.mock('@/lib/firestore/audit', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   writeAuditLog: (...args: unknown[]) => mockWriteAuditLog(...args),
+}));
+
+// Story PI-3 (Sprint 7.2) — let the real `writePaymentAudit` run so the
+// audit log call observed by the test matches the production shape
+// (transformed actor→actorId/actorName/actorRole, redacted PII, diff
+// injected into `after`).
+vi.mock('@/lib/audit/payment-audit', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
 }));
 
 vi.mock('@/lib/notifications/trigger', () => ({
@@ -221,7 +230,19 @@ describe('PATCH /api/payments/[id]/confirm — Story B.3.1 (F-CRIT-06)', () => {
         { confirmedBy: 'user-001', note: 'ok' },
         'user-001',
       );
+      // PI-3: legacy confirm writes through writePaymentAudit, which
+      // produces a `payment_confirmed` entry with __diff in after.
       expect(mockWriteAuditLog).toHaveBeenCalledOnce();
+      expect(mockWriteAuditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'payment_confirmed',
+          entityType: 'payment',
+          after: expect.objectContaining({
+            caseId: 'case-001',
+            trigger: 'PI-3 legacy confirm',
+          }),
+        }),
+      );
     });
 
     it('contains exactly the 1 role specified by Decision A (pin invariant)', () => {
@@ -289,6 +310,9 @@ describe('PATCH /api/payments/[id]/confirm — Story B.3.1 (F-CRIT-06)', () => {
         params: { id: 'pay-001' },
       });
 
+      // Story PI-3 (Sprint 7.2) — the SoD denial audit now goes through
+      // `writePaymentAudit`, which surfaces the abort metadata under
+      // `after.metadata` and lifts `caseId` to the top of `after`.
       expect(mockWriteAuditLog).toHaveBeenCalledWith(
         expect.objectContaining({
           actorId: 'user-001',
@@ -301,9 +325,12 @@ describe('PATCH /api/payments/[id]/confirm — Story B.3.1 (F-CRIT-06)', () => {
             createdBy: 'user-001',
           }),
           after: expect.objectContaining({
-            denied: true,
-            reason: 'sod_violation',
-            attemptedBy: 'user-001',
+            caseId: 'case-001',
+            metadata: expect.objectContaining({
+              denied: true,
+              reason: 'sod_violation',
+              attemptedBy: 'user-001',
+            }),
           }),
         }),
       );
@@ -345,7 +372,13 @@ describe('PATCH /api/payments/[id]/confirm — Story B.3.1 (F-CRIT-06)', () => {
         expect.objectContaining({
           actorId: 'user-001',
           action: 'payment_confirmed',
-          after: expect.objectContaining({ confirmedBy: 'user-001' }),
+          // PI-3: structured diff surfaces the confirmedBy change inline.
+          after: expect.objectContaining({
+            caseId: 'case-001',
+            __diff: expect.objectContaining({
+              confirmedBy: { from: undefined, to: 'user-001' },
+            }),
+          }),
         }),
       );
     });

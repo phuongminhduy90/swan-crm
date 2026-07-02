@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createRefundSchema } from '@/lib/validators/payment';
 import { writeAuditLog } from '@/lib/firestore/audit';
+import { writePaymentAudit } from '@/lib/audit/payment-audit';
 import { getPayment } from '@/lib/firestore/payments';
 import { requireAuth, isErrorResponse } from '@/lib/api/auth';
 import { REFUND_CREATE_ROLES } from '@/constants/permissions';
@@ -101,32 +102,46 @@ export async function POST(request: NextRequest) {
     );
 
     // 6. Audit log — refund payment itself
-    await writeAuditLog({
-      actorId: user.uid,
-      actorName: user.displayName,
-      actorRole: user.role,
+    // Story PI-3 (Sprint 7.2) — enriched payload with structured diff
+    // (from null → full refund record), state transition (none → confirmed),
+    // caseId link, originalPaymentId link for refund-chain tracing.
+    await writePaymentAudit({
       action: 'payment_created',
-      entityType: 'payment',
       entityId: refund.id,
-      after: {
-        paymentType: 'refund',
-        originalPaymentId: data.originalPaymentId,
-        amount: refund.amount,
-        caseId: refund.caseId,
-        note: refund.note,
+      actor: {
+        uid: user.uid,
+        displayName: user.displayName,
+        role: user.role,
       },
+      after: refund,
+      caseId: refund.caseId,
+      originalPaymentId: data.originalPaymentId,
+      trigger: 'PI-3 refund created',
     });
 
     // 7. Audit log — original payment marker (so auditors can trace chains
-    //    from the original payment's audit history directly)
-    await writeAuditLog({
-      actorId: user.uid,
-      actorName: user.displayName,
-      actorRole: user.role,
+    //    from the original payment's audit history directly).
+    // Story PI-3 — `payment_refunded` is now linked back to the refund via
+    // the `originalPaymentId` field in the `after` payload.
+    await writePaymentAudit({
       action: 'payment_refunded',
-      entityType: 'payment',
       entityId: data.originalPaymentId,
+      actor: {
+        uid: user.uid,
+        displayName: user.displayName,
+        role: user.role,
+      },
+      before: original,
       after: {
+        ...original,
+        note: original.note
+          ? `${original.note} — refunded ${refund.amount.toLocaleString('vi-VN')} VNĐ`
+          : `refunded ${refund.amount.toLocaleString('vi-VN')} VNĐ`,
+      },
+      caseId: original.caseId,
+      originalPaymentId: data.originalPaymentId,
+      trigger: 'PI-3 refund marker',
+      metadata: {
         refundPaymentId: refund.id,
         refundAmount: refund.amount,
         refundedBy: user.uid,

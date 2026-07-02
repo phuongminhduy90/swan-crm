@@ -71,7 +71,40 @@ export interface CaseRecord {
   treatmentLocationType?: TreatmentLocationType;
 
   expectedLabDate?: string;
+
+  /**
+   * Story PI-4 (Sprint 7.2) — Forecasted procedure date. Used as the
+   * backward-compat fallback only — see `actualProcedureDate` for the
+   * source-of-truth convention.
+   *
+   * Stored as ISO-8601 string (e.g. `2026-07-15T00:00:00.000Z`). Vietnam
+   * is UTC+7 (no DST), so the storage form is local-midnight rendered as
+   * UTC midnight. The actual fix for any TZ drift is owned by Sprint 7.3
+   * C.3.2 — this story only documents the convention.
+   *
+   * @see resolveProcedureDateForFollowups in `@/lib/firestore/followups`.
+   */
   expectedProcedureDate?: string;
+
+  /**
+   * Story B.2.4 + Story PI-4 (Sprint 7.2) — Date the case ACTUALLY moved
+   * to `procedure_completed`. **Source of truth** for D1/D3/D7/D14/D30/D90
+   * follow-up due-date computation. Captured from a `<input type="date">`
+   * in the status-workflow UI BEFORE the status flip; persisted to the
+   * case record; then passed as the `procedureDate` argument to
+   * `createPostOpFollowups`.
+   *
+   * Resolution priority when scheduling follow-ups:
+   *   1. `actualProcedureDate`  ← preferred
+   *   2. `expectedProcedureDate` ← backward-compat fallback
+   *   3. `new Date()`           ← terminal fallback (prevents orphans)
+   *
+   * Storage convention: ISO-8601 string, UTC midnight. Same TZ disclaimer
+   * as `expectedProcedureDate` above — Sprint 7.3 C.3.2 owns the canonical
+   * form. PI-4 only documents the contract.
+   *
+   * @see resolveProcedureDateForFollowups in `@/lib/firestore/followups`.
+   */
   actualProcedureDate?: string;
 
   status: CaseStatus;

@@ -18,6 +18,22 @@ import { signOut } from '@/lib/firebase/auth';
 import { Notification, NotificationEventType, UserRole } from '@/lib/types';
 import { cn } from '@/lib/utils/cn';
 
+/**
+ * Story PI-5 / TD-7 — Fallback `currentUserId` for the no-auth path.
+ *
+ * Historically this defaulted to `'user-001'` (the dev admin seed) which:
+ *   1. Matched the A2 anti-pattern regex (`user-\d{3}`) and tripped the TD-6
+ *      gate in `--all` mode.
+ *   2. Silently fetched notifications against a real user ID, leaking
+ *      `'user-001`'s readBy into the dev session (cosmetic, but observable).
+ *
+ * `'placeholder'` is a known-no-match sentinel: the `/api/notifications`
+ * endpoint returns empty for an unknown ID, so the bell collapses to "no
+ * notifications" until an actual profile is set. No `user-\d{3}` strings
+ * appear in source, so the A2 gate stays clean.
+ */
+const FALLBACK_USER_ID = 'placeholder';
+
 interface TopbarProps {
   onMenuToggle: () => void;
 }
@@ -68,7 +84,7 @@ export function Topbar({ onMenuToggle }: TopbarProps) {
   const [unreadCount, setUnreadCount] = useState(0);
   const notifRef = useRef<HTMLDivElement>(null);
 
-  const currentUserId = userProfile?.id ?? 'user-001';
+  const currentUserId = userProfile?.id ?? FALLBACK_USER_ID;
 
   const fetchNotifications = useCallback(async () => {
     try {

@@ -18,7 +18,7 @@ import {
 import { getCustomer } from '@/lib/firestore/customers';
 import { requirePermission, isErrorResponse } from '@/lib/api/auth';
 import { triggerAutoTasks } from '@/lib/tasks/auto-tasks';
-import { createPostOpFollowups } from '@/lib/firestore/followups';
+import { createPostOpFollowups, resolveProcedureDateForFollowups } from '@/lib/firestore/followups';
 import { isFlagEnabled } from '@/lib/feature-flags';
 import {
   evaluateClinicalChecklist,
@@ -153,13 +153,18 @@ export async function PATCH(
       console.error('[AutoTasks] Failed to trigger:', err);
     }
 
-    // Khi hoàn thành thủ thuật → tạo lịch follow-up D1/D3/D7/D14/D30/D90
+    // Khi hoàn thành thủ thuật → tạo lịch follow-up D1/D3/D7/D14/D30/D90.
+    // Story PI-4 (Sprint 7.2) — `actualProcedureDate` is the source of
+    // truth for D1–D90 scheduling. `resolveProcedureDateForFollowups()`
+    // encodes the priority order (actual → expected → now) so the
+    // server-side path matches the client-side StatusWorkflow behaviour.
     if (newStatus === 'procedure_completed') {
       try {
+        const procedureDate = resolveProcedureDateForFollowups(existing);
         await createPostOpFollowups(
           params.id,
           existing.customerId,
-          existing.expectedProcedureDate ?? new Date().toISOString(),
+          procedureDate,
           undefined,
         );
       } catch (err) {

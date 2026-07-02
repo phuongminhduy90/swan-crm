@@ -49,9 +49,17 @@ vi.mock('@/lib/tasks/auto-tasks', () => ({
 }));
 
 const mockCreatePostOpFollowups = vi.fn();
-vi.mock('@/lib/firestore/followups', () => ({
-  createPostOpFollowups: (...args: unknown[]) => mockCreatePostOpFollowups(...args),
-}));
+vi.mock('@/lib/firestore/followups', async (importOriginal) => {
+  // Story PI-4 — the real module now exports `resolveProcedureDateForFollowups`
+  // alongside `createPostOpFollowups`. We use `importOriginal` so the helper
+  // runs at its real priority order (actualProcedureDate → expectedProcedureDate
+  // → now) while `createPostOpFollowups` is mocked for assertion.
+  const actual = await importOriginal<typeof import('@/lib/firestore/followups')>();
+  return {
+    ...actual,
+    createPostOpFollowups: (...args: unknown[]) => mockCreatePostOpFollowups(...args),
+  };
+});
 
 // Story B.2.1 — gate evaluator mock. Default returns allPassed=true so
 // existing B.1.3 + B.2.2 tests keep passing; individual tests override.
@@ -901,5 +909,162 @@ describe('medical_alert_resolved — Story B.2.2 (F-HIGH-19)', () => {
     );
     expect(res.status).toBe(400);
     expect(mockUpdateCaseStatus).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Story PI-4 (Sprint 7.2) — `actualProcedureDate` is the source of truth
+ * for D1–D90 follow-up scheduling. The server-side status route must
+ * honour the same priority order as the client-side StatusWorkflow:
+ *   1. `case.actualProcedureDate`  ← preferred
+ *   2. `case.expectedProcedureDate`
+ *   3. `new Date().toISOString()`  ← terminal fallback
+ *
+ * Pre-PI-4 the route read `expectedProcedureDate` directly, which meant the
+ * server-side path would silently ignore `actualProcedureDate` if the client
+ * hadn't proactively persisted the date.
+ *
+ * @see docs/ux-redesign/STORY_PI_4_IMPLEMENTATION_REPORT.md
+ * @see docs/ux-redesign/SPRINT_7_2_EXECUTION_PLAN.md §1 row 9 (PI-4) + §R7.2-8
+ */
+describe('PATCH /api/cases/[id]/status — Story PI-4 (F-HIGH-08 partial) actualProcedureDate is source of truth', () => {
+  const ORIGINAL_ENV = process.env;
+
+  beforeEach(() => {
+    process.env = { ...ORIGINAL_ENV };
+    vi.clearAllMocks();
+    mockUpdateCaseStatus.mockResolvedValue(undefined);
+    mockWriteAuditLog.mockResolvedValue(undefined);
+    mockGetCustomer.mockResolvedValue({ id: 'cust-001', fullName: 'Nguyễn Văn A' });
+    mockCreatePostOpFollowups.mockResolvedValue(undefined);
+    (resolveCskhDisplayName as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(
+      'Phạm Ngọc Điệp',
+    );
+    mockEvaluateClinicalChecklist.mockResolvedValue({
+      items: [],
+      allPassed: true,
+      failedKeys: [],
+    });
+  });
+
+  afterEach(() => {
+    process.env = ORIGINAL_ENV;
+  });
+
+  it('passes `actualProcedureDate` to createPostOpFollowups when both dates are set', async () => {
+    mockGetCase.mockResolvedValue(
+      buildCase({
+        status: 'in_procedure',
+        actualProcedureDate: '2026-07-15T00:00:00.000Z',
+        expectedProcedureDate: '2026-07-10T00:00:00.000Z',
+      }),
+    );
+
+    const res = await PATCH(
+      buildRequest('cso', { status: 'procedure_completed' }),
+      { params: { id: 'case-001' } },
+    );
+    expect(res.status).toBe(200);
+
+    expect(mockCreatePostOpFollowups).toHaveBeenCalledTimes(1);
+    const args = (mockCreatePostOpFollowups as unknown as ReturnType<typeof vi.fn>).mock
+      .calls[0] as unknown[];
+    // arg layout: (caseId, customerId, procedureDate, assignedTo)
+    expect(args[0]).toBe('case-001');
+    expect(args[1]).toBe('cust-001');
+    // MUST be the actual date — pre-PI-4 this would be the expected date.
+    expect(args[2]).toBe('2026-07-15T00:00:00.000Z');
+    expect(args[2]).not.toBe('2026-07-10T00:00:00.000Z');
+  });
+
+  it('falls back to `expectedProcedureDate` when `actualProcedureDate` is missing', async () => {
+    mockGetCase.mockResolvedValue(
+      buildCase({
+        status: 'in_procedure',
+        expectedProcedureDate: '2026-07-10T00:00:00.000Z',
+        // actualProcedureDate intentionally omitted
+      }),
+    );
+
+    const res = await PATCH(
+      buildRequest('cso', { status: 'procedure_completed' }),
+      { params: { id: 'case-001' } },
+    );
+    expect(res.status).toBe(200);
+
+    expect(mockCreatePostOpFollowups).toHaveBeenCalledTimes(1);
+    const args = (mockCreatePostOpFollowups as unknown as ReturnType<typeof vi.fn>).mock
+      .calls[0] as unknown[];
+    expect(args[2]).toBe('2026-07-10T00:00:00.000Z');
+  });
+
+  it('falls back to a "now" ISO string when neither date is set (terminal fallback)', async () => {
+    mockGetCase.mockResolvedValue(
+      buildCase({
+        status: 'in_procedure',
+        // neither actualProcedureDate nor expectedProcedureDate
+      }),
+    );
+
+    const before = Date.now();
+    const res = await PATCH(
+      buildRequest('cso', { status: 'procedure_completed' }),
+      { params: { id: 'case-001' } },
+    );
+    const after = Date.now();
+
+    expect(res.status).toBe(200);
+    expect(mockCreatePostOpFollowups).toHaveBeenCalledTimes(1);
+
+    const args = (mockCreatePostOpFollowups as unknown as ReturnType<typeof vi.fn>).mock
+      .calls[0] as unknown[];
+    expect(typeof args[2]).toBe('string');
+    expect(args[2]).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    const ts = new Date(args[2] as string).getTime();
+    expect(ts).toBeGreaterThanOrEqual(before);
+    expect(ts).toBeLessThanOrEqual(after + 50);
+  });
+
+  it('does NOT call createPostOpFollowups for non-procedure_completed transitions', async () => {
+    // `draft → waiting_payment_confirmation` is a valid transition that
+    // does NOT trigger follow-up scheduling. Use it as the negative case
+    // to prove the `if (newStatus === 'procedure_completed')` guard.
+    mockGetCase.mockResolvedValue(
+      buildCase({
+        status: 'draft',
+        actualProcedureDate: '2026-07-15T00:00:00.000Z',
+      }),
+    );
+
+    const res = await PATCH(
+      buildRequest('cso', { status: 'waiting_payment_confirmation' }),
+      { params: { id: 'case-001' } },
+    );
+    expect(res.status).toBe(200);
+    expect(mockCreatePostOpFollowups).not.toHaveBeenCalled();
+  });
+
+  it('does NOT regress when FEATURE_CHECKLIST_GATE blocks the transition (no followups created)', async () => {
+    process.env.NEXT_PUBLIC_FEATURE_CHECKLIST_GATE = 'true';
+    process.env.NEXT_PUBLIC_FEATURE_SERVER_RBAC = 'true';
+    mockGetCase.mockResolvedValue(
+      buildCase({
+        status: 'reminder_sent',
+        actualProcedureDate: '2026-07-15T00:00:00.000Z',
+      }),
+    );
+    mockEvaluateClinicalChecklist.mockResolvedValue({
+      items: [],
+      allPassed: false,
+      failedKeys: ['blood_test_result'],
+    });
+
+    const res = await PATCH(
+      buildRequest('cso', { status: 'checked_in' }),
+      { params: { id: 'case-001' } },
+    );
+    expect(res.status).toBe(400);
+    // Gate blocks everything — followups must NOT be scheduled.
+    expect(mockCreatePostOpFollowups).not.toHaveBeenCalled();
   });
 });
